@@ -1,10 +1,30 @@
+import { useEffect, useState } from 'react';
+import { useApi } from '@/hooks/useApi';
 import { ModeToggle } from "@/components/mode-toggle"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Shield, Zap, CheckCircle, Menu, Github, Brain, Mail, Phone, MapPin, Twitter, Linkedin } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import axios from 'axios';
 
 export default function Landing() {
   const navigate = useNavigate()
+  const { data, error, isLoading, execute } = useApi();
+  const [backendMessage, setBackendMessage] = useState('');
+
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const response = await axios.get('http://localhost:3000/api/test');
+        setBackendMessage(response.data.message);
+        console.log('Backend response:', response.data);
+      } catch (error) {
+        console.error('Connection error:', error);
+        setBackendMessage('Connection failed');
+      }
+    };
+
+    testConnection();
+  }, []);
 
   // Add this function to handle smooth scrolling
   const scrollToSection = (sectionId: string) => {
@@ -90,6 +110,9 @@ export default function Landing() {
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Zap className="h-5 w-5" />
                   <span>Lightning fast results</span>
+                </div>
+                <div className="mt-4 text-center text-muted-foreground">
+                  {backendMessage && `Backend Status: ${backendMessage}`}
                 </div>
               </div>
             </div>

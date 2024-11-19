@@ -1,45 +1,19 @@
-import * as React from "react"
-import { Button } from "../ui/button"
-import { 
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "../ui/dialog"
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from "../ui/tabs"
-import { ScrollArea } from "../ui/scroll-area"
-import { Badge } from "../ui/badge"
-import { Card } from "../ui/card"
-import { cn } from "@/lib/utils"
-import { 
-  ChevronLeft, ChevronRight, 
-  ZoomIn, ZoomOut, RotateCcw,
-  ArrowLeft, Search, Filter,
-  Save, CheckCircle
-} from "lucide-react"
+import { FC } from 'react'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+
+export type FeatureCategory = 'faceShape' | 'nose' | 'mouth' | 'eyes' | 'eyebrows' | 'ears';
 
 interface CompositeBuilderProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open: boolean;
+  onClose: () => void;
 }
 
-type FeatureCategory = 'faceShape' | 'nose' | 'mouth' | 'eyes' | 'eyebrows'
-
-export function CompositeBuilder({ open, onOpenChange }: CompositeBuilderProps) {
-  const [currentFeature, setCurrentFeature] = React.useState<FeatureCategory>('faceShape')
-  const [zoom, setZoom] = React.useState(100)
-  
-  const features: FeatureCategory[] = ['faceShape', 'nose', 'mouth', 'eyes', 'eyebrows']
-
+export const CompositeBuilder: FC<CompositeBuilderProps> = ({ open, onClose }) => {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Rest of the component code stays the same */}
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl">
+        {/* Your composite builder content */}
+      </DialogContent>
     </Dialog>
   )
 } 

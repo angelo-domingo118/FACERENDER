@@ -1,11 +1,11 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { 
   ChevronLeft, ChevronRight, 
   ZoomIn, ZoomOut, RotateCcw,
   ArrowLeft, Search, Filter,
   Save, CheckCircle, Check,
-  Maximize2, RotateCw, X
+  Maximize2, RotateCw, X, ArrowRight, Loader2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useNavigate } from "react-router-dom"
@@ -31,8 +31,18 @@ import {
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
+import api from '@/lib/api'
+import axios from 'axios'
+import { useToast } from "@/hooks/use-toast"
 
-type FeatureCategory = 'faceShape' | 'nose' | 'mouth' | 'eyes' | 'eyebrows'
+interface Feature {
+  id: string;
+  url: string;
+  category: string;
+  type: number;
+}
+
+type FeatureCategory = 'faceShape' | 'nose' | 'mouth' | 'eyes' | 'eyebrows' | 'ears';
 
 export default function CompositeBuilder() {
   const navigate = useNavigate()
@@ -42,17 +52,62 @@ export default function CompositeBuilder() {
   const [progress, setProgress] = useState(0)
   const [selectedFeatures, setSelectedFeatures] = useState<Record<FeatureCategory, boolean>>({
     faceShape: false,
+    eyes: false,
+    eyebrows: false,
     nose: false,
     mouth: false,
-    eyes: false,
-    eyebrows: false
+    ears: false
   })
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
-  const [selectedFeatureId, setSelectedFeatureId] = useState<number | null>(null)
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  
+  const [features, setFeatures] = useState<Feature[]>([])
+  const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
+
   const placeholderFeatures = Array(9).fill(null)
-  const features: FeatureCategory[] = ['faceShape', 'nose', 'mouth', 'eyes', 'eyebrows']
+  const featureCategories: FeatureCategory[] = [
+    'faceShape', 
+    'eyes', 
+    'eyebrows', 
+    'nose', 
+    'mouth', 
+    'ears'
+  ];
+
+  useEffect(() => {
+    const fetchFeatures = async () => {
+      setLoading(true);
+      console.log('Fetching features for category:', currentFeature);
+      try {
+        const response = await api.get(`/api/features/${currentFeature}`);
+        console.log('API Response:', response.data);
+        
+        if (response.data?.success && Array.isArray(response.data.data)) {
+          if (response.data.data.length === 0) {
+            console.warn(`No features found for category: ${currentFeature}`);
+            // Show user-friendly message
+            // toast.warning(`No ${currentFeature} features available`);
+          }
+          setFeatures(response.data.data);
+        } else {
+          console.error('Invalid response structure:', response.data);
+          // Show error to user
+          // toast.error(`Failed to load ${currentFeature} features`);
+          setFeatures([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch features:', error);
+        // Show error to user
+        // toast.error(`Error loading features: ${error.message}`);
+        setFeatures([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeatures();
+  }, [currentFeature]);
 
   // Calculate progress based on selected features
   const calculateProgress = () => {
@@ -77,11 +132,61 @@ export default function CompositeBuilder() {
     setSelectedFeatureId(null)
   }
 
+  const getCategoryDisplay = (category: string) => {
+    const mapping: Record<string, string> = {
+      faceShape: 'Face Shape',
+      eyes: 'Eyes',
+      eyebrows: 'Eyebrows',
+      nose: 'Nose',
+      mouth: 'Mouth',
+      ears: 'Ears'
+    };
+    return mapping[category] || category;
+  };
+
+  const handleSaveDraft = useCallback(async () => {
+    try {
+      // TODO: Implement actual save logic
+      await api.post('/api/composites/draft', {
+        features: selectedFeatures,
+        currentFeature,
+        progress
+      })
+      
+      toast({
+        title: "Draft saved",
+        description: "Your composite has been saved as a draft"
+      })
+    } catch (error) {
+      console.error('Failed to save draft:', error)
+      toast({
+        variant: "destructive",
+        title: "Error saving draft",
+        description: "Please try again later"
+      })
+    }
+  }, [selectedFeatures, currentFeature, progress])
+
+  const handleExit = useCallback(() => {
+    const hasUnsavedChanges = Object.values(selectedFeatures).some(Boolean)
+    
+    if (!hasUnsavedChanges) {
+      navigate('/dashboard')
+      return
+    }
+
+    // Show confirmation only if there are changes
+    const confirmed = window.confirm("Are you sure you want to exit? Any unsaved changes will be lost.")
+    if (confirmed) {
+      navigate('/dashboard')
+    }
+  }, [selectedFeatures, navigate])
+
   return (
     <div className="h-screen flex bg-background">
       {/* Left Panel - Fixed width */}
-      <div className="w-72 flex-shrink-0 border-r bg-muted/5 flex flex-col">
-        {/* Back Navigation */}
+      <div className="w-80 flex-shrink-0 border-r bg-muted/5 flex flex-col">
+        {/* Header */}
         <div className="p-4 border-b">
           <div className="flex items-center gap-2">
             <Button 
@@ -91,55 +196,65 @@ export default function CompositeBuilder() {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="font-semibold">Feature Selection</h1>
+            <span className="font-medium">Composite Builder</span>
           </div>
         </div>
 
-        {/* Feature Categories - Vertical Buttons */}
-        <div className="flex-1 p-4">
-          <div className="space-y-4">
-            <div className="text-sm text-foreground/70">
-              Select initial features for each category before proceeding to the detailed editor.
-            </div>
-            <div className="space-y-1">
-              {features.map((feature) => (
-                <Button
-                  key={feature}
-                  variant={currentFeature === feature ? "default" : "ghost"}
-                  onClick={() => setCurrentFeature(feature)}
-                  className={cn(
-                    "w-full justify-start h-9 px-3 text-sm group",
-                    currentFeature === feature 
-                      ? "bg-primary/10 text-primary hover:text-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <div className="flex items-center w-full gap-2">
-                    <div className="w-4 h-4 flex items-center justify-center">
-                      {selectedFeatures[feature] && (
-                        <Check className="h-3.5 w-3.5 text-primary" />
-                      )}
-                    </div>
-                    <span className="select-none">{feature.charAt(0).toUpperCase() + feature.slice(1)}</span>
+        {/* Feature Categories */}
+        <ScrollArea className="flex-1">
+          <div className="p-4 space-y-2">
+            {featureCategories.map((feature) => (
+              <Button
+                key={feature}
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start",
+                  currentFeature === feature 
+                    ? "bg-accent text-accent-foreground" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
+                )}
+                onClick={() => setCurrentFeature(feature)}
+              >
+                <div className="flex items-center w-full gap-2">
+                  <div className="w-4 h-4 flex items-center justify-center">
+                    {selectedFeatures[feature] && (
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                    )}
                   </div>
-                </Button>
-              ))}
-            </div>
+                  <span className="select-none">{getCategoryDisplay(feature)}</span>
+                </div>
+              </Button>
+            ))}
           </div>
-        </div>
+        </ScrollArea>
 
         {/* Action Buttons */}
         <div className="p-4 border-t space-y-2">
-          <Button 
-            className="w-full"
-            onClick={() => setShowFinishDialog(true)}
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={handleSaveDraft}
           >
-            <CheckCircle className="mr-2 h-4 w-4" />
-            Continue to Editor
+            <Save className="h-4 w-4 mr-2" />
+            Save Draft
           </Button>
-          <Button variant="outline" className="w-full">
-            <Save className="mr-2 h-4 w-4" />
-            Save Selection
+
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={handleExit}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Exit
+          </Button>
+
+          <Button
+            className="w-full justify-start"
+            onClick={() => setShowFinishDialog(true)}
+            disabled={!Object.values(selectedFeatures).some(Boolean)}
+          >
+            <ArrowRight className="h-4 w-4 mr-2" />
+            Continue to Editor
           </Button>
         </div>
       </div>
@@ -170,28 +285,53 @@ export default function CompositeBuilder() {
           <div className="p-6">
             <div className="mb-6">
               <h3 className="text-sm font-medium mb-3">Recommended Features</h3>
-              <div className="grid grid-cols-3 gap-6">
-                {placeholderFeatures.map((_, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "relative rounded-lg bg-muted/50 border-2 transition-all cursor-pointer",
-                      "hover:border-primary/50 hover:bg-muted/70",
-                      selectedFeatureId === i ? "border-primary" : "border-transparent"
-                    )}
-                    style={{ aspectRatio: '1' }}
-                    onClick={() => {
-                      setSelectedFeatureId(i)
-                      handleFeatureSelect()
-                    }}
-                  >
-                    {selectedFeatureId === i && (
-                      <div className="absolute top-2 right-2">
-                        <Check className="h-4 w-4 text-primary" />
-                      </div>
-                    )}
+              <div className="grid grid-cols-3 gap-4 p-4">
+                {loading ? (
+                  // Loading placeholders
+                  Array(9).fill(null).map((_, i) => (
+                    <div
+                      key={i}
+                      className="aspect-square rounded-lg bg-muted/50 animate-pulse"
+                    />
+                  ))
+                ) : features.length > 0 ? (
+                  // Actual features
+                  features.map((feature) => (
+                    <div
+                      key={feature.id}
+                      className={cn(
+                        "relative rounded-lg bg-muted/50 border-2 transition-all cursor-pointer overflow-hidden",
+                        "hover:border-primary/50 hover:bg-muted/70",
+                        selectedFeatureId === feature.id ? "border-primary" : "border-transparent"
+                      )}
+                      style={{ aspectRatio: '1' }}
+                      onClick={() => {
+                        setSelectedFeatureId(feature.id);
+                        handleFeatureSelect();
+                      }}
+                    >
+                      <img 
+                        src={feature.url}
+                        alt={`${currentFeature} type ${feature.type}`}
+                        className="w-full h-full object-contain p-2"
+                        onError={(e) => {
+                          console.error(`Failed to load image: ${feature.url}`);
+                          e.currentTarget.src = '/placeholder-image.png';
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                      {selectedFeatureId === feature.id && (
+                        <div className="absolute top-2 right-2">
+                          <Check className="h-4 w-4 text-primary" />
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-3 text-center text-muted-foreground py-8">
+                    No features found for {getCategoryDisplay(currentFeature)}
                   </div>
-                ))}
+                )}
               </div>
             </div>
 

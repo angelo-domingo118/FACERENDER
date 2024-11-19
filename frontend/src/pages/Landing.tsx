@@ -10,20 +10,33 @@ export default function Landing() {
   const navigate = useNavigate()
   const { data, error, isLoading, execute } = useApi();
   const [backendMessage, setBackendMessage] = useState('');
+  const [dbStatus, setDbStatus] = useState('');
 
   useEffect(() => {
-    const testConnection = async () => {
+    const testConnections = async () => {
       try {
+        // Test basic backend connectivity
         const response = await axios.get('http://localhost:3000/api/test');
         setBackendMessage(response.data.message);
-        console.log('Backend response:', response.data);
+
+        // Test database connectivity
+        const dbResponse = await axios.post('http://localhost:3000/api/test', {
+          message: 'Connection test ' + new Date().toISOString()
+        });
+        setDbStatus(dbResponse.data.message);
+        
+        // Get latest test
+        const latestResponse = await axios.get('http://localhost:3000/api/test/latest');
+        console.log('Latest test:', latestResponse.data);
+        
       } catch (error) {
         console.error('Connection error:', error);
-        setBackendMessage('Connection failed');
+        setBackendMessage('Backend connection failed');
+        setDbStatus('Database connection failed');
       }
     };
 
-    testConnection();
+    testConnections();
   }, []);
 
   // Add this function to handle smooth scrolling
@@ -111,8 +124,17 @@ export default function Landing() {
                   <Zap className="h-5 w-5" />
                   <span>Lightning fast results</span>
                 </div>
-                <div className="mt-4 text-center text-muted-foreground">
-                  {backendMessage && `Backend Status: ${backendMessage}`}
+                <div className="mt-4 text-center space-y-2">
+                  {backendMessage && (
+                    <div className="text-muted-foreground">
+                      Backend Status: {backendMessage}
+                    </div>
+                  )}
+                  {dbStatus && (
+                    <div className="text-muted-foreground">
+                      Database Status: {dbStatus}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

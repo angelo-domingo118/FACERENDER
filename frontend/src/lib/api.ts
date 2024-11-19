@@ -1,39 +1,34 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000', // Your NestJS backend URL
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: 'http://localhost:3002',
+  timeout: 15000,
   withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
-// Request interceptor for API calls
+// Add request interceptor for debugging
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  config => {
+    console.log('Making request to:', config.url, config);
     return config;
   },
-  (error) => {
+  error => {
+    console.error('Request error:', error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor for API calls
+// Add response interceptor for debugging
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    // Handle 401 errors (unauthorized) here if needed
-    if (error.response.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      // Handle token refresh or redirect to login
-    }
-
+  response => {
+    console.log('Response:', response);
+    return response;
+  },
+  error => {
+    console.error('Response error:', error.response || error);
     return Promise.reject(error);
   }
 );

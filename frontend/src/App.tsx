@@ -5,6 +5,7 @@ import Auth from "./pages/Auth"
 import Dashboard from "./pages/Dashboard"
 import CompositeBuilder from "@/pages/CompositeBuilder"
 import CompositeEditor from "@/pages/CompositeEditor"
+import { Toaster } from "@/components/ui/toaster"
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="/composite-editor" element={<CompositeEditor />} />
         </Routes>
       </Router>
+      <Toaster />
     </ThemeProvider>
   )
 }

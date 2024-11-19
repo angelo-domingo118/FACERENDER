@@ -14,9 +14,9 @@ import {
   ArrowUpLeft, ArrowDownLeft, ArrowUpRight, ArrowDownRight,
   Maximize2, Minimize2,
   ChevronsUpDown, ChevronsLeftRight,
-  Search, Filter, X
+  Search, Filter, X, Check
 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Slider } from "@/components/ui/slider"
 import {
   DropdownMenu,
@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { ModeToggle } from "@/components/mode-toggle"
+import api from '@/lib/api'
 
 interface TransformSettings {
   face: {
@@ -45,10 +46,11 @@ interface TransformSettings {
 
 interface FeatureItem {
   id: string
-  name: string
-  preview: string
-  tags: string[]
+  url: string
   category: string
+  type: number
+  name: string
+  tags: string[]
   ethnicity?: string[]
   age?: string[]
 }
@@ -96,6 +98,40 @@ export default function CompositeEditor() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [features, setFeatures] = useState<FeatureItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null)
+
+  // Add useEffect to fetch features when category changes
+  useEffect(() => {
+    const fetchFeatures = async () => {
+      if (!selectedFeature) return;
+      
+      setLoading(true);
+      console.log('Fetching features for category:', selectedFeature);
+      try {
+        const response = await api.get(`/api/features/${selectedFeature.toLowerCase()}`);
+        console.log('API Response:', response.data);
+        
+        if (response.data?.success && Array.isArray(response.data.data)) {
+          if (response.data.data.length === 0) {
+            console.warn(`No features found for category: ${selectedFeature}`);
+          }
+          setFeatures(response.data.data);
+        } else {
+          console.error('Invalid response structure:', response.data);
+          setFeatures([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch features:', error);
+        setFeatures([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeatures();
+  }, [selectedFeature]);
 
   const dummyFeatures: FeatureItem[] = [
     {
@@ -679,48 +715,44 @@ export default function CompositeEditor() {
                     {[
                       { 
                         label: "Eyes",
-                        icon: <Eye className="h-5 w-5" />,
-                        count: dummyFeatures.filter(f => f.category === "Eyes").length
+                        icon: <Eye className="h-5 w-5" />
                       },
                       { 
                         label: "Nose",
-                        icon: <StretchHorizontal className="h-5 w-5" />,
-                        count: dummyFeatures.filter(f => f.category === "Nose").length
+                        icon: <StretchHorizontal className="h-5 w-5" />
                       },
                       { 
                         label: "Mouth",
-                        icon: <StretchHorizontal className="h-5 w-5 rotate-180" />,
-                        count: dummyFeatures.filter(f => f.category === "Mouth").length
+                        icon: <StretchHorizontal className="h-5 w-5 rotate-180" />
                       },
                       { 
                         label: "Ears",
-                        icon: <StretchVertical className="h-5 w-5" />,
-                        count: dummyFeatures.filter(f => f.category === "Ears").length
+                        icon: <StretchVertical className="h-5 w-5" />
                       },
                       { 
                         label: "Eyebrows",
-                        icon: <StretchHorizontal className="h-5 w-5" />,
-                        count: dummyFeatures.filter(f => f.category === "Eyebrows").length
+                        icon: <StretchHorizontal className="h-5 w-5" />
                       },
                       { 
                         label: "Face Shape",
-                        icon: <Maximize2 className="h-5 w-5" />,
-                        count: dummyFeatures.filter(f => f.category === "Face Shape").length
+                        icon: <Maximize2 className="h-5 w-5" />
                       },
+                      { 
+                        label: "Hair",
+                        value: "hair",
+                        icon: <StretchVertical className="h-5 w-5 rotate-45" />
+                      }
                     ].map((feature) => (
                       <Button
                         key={feature.label}
                         variant="outline"
-                        className="h-24 flex flex-col items-center justify-center gap-2 hover:border-primary group relative"
+                        className="h-20 flex flex-col items-center justify-center gap-2 hover:border-primary group relative"
                         onClick={() => setSelectedFeature(feature.label)}
                       >
                         <div className="h-10 w-10 rounded-lg bg-background border flex items-center justify-center group-hover:border-primary transition-colors">
                           {feature.icon}
                         </div>
-                        <div className="text-center">
-                          <div className="text-sm font-medium">{feature.label}</div>
-                          <div className="text-xs text-muted-foreground">{feature.count} items</div>
-                        </div>
+                        <div className="text-sm font-medium">{feature.label}</div>
                       </Button>
                     ))}
                   </div>
@@ -751,30 +783,55 @@ export default function CompositeEditor() {
 
                     {/* Features Grid */}
                     <div className="grid grid-cols-2 gap-3 pt-2">
-                      {dummyFeatures
-                        .filter(feature => 
-                          feature.category === selectedFeature &&
-                          (searchQuery === "" || 
+                      {loading ? (
+                        // Loading placeholders
+                        Array(6).fill(null).map((_, i) => (
+                          <div
+                            key={i}
+                            className="aspect-square rounded-lg bg-muted/50 animate-pulse"
+                          />
+                        ))
+                      ) : features.length > 0 ? (
+                        features
+                          .filter(feature => 
+                            searchQuery === "" || 
                             feature.name.toLowerCase().includes(searchQuery.toLowerCase())
                           )
-                        )
-                        .map((feature) => (
-                          <Button
-                            key={feature.id}
-                            variant="outline"
-                            className="h-32 p-2 flex flex-col items-center justify-between hover:border-primary group"
-                          >
-                            <div className="w-full h-20 rounded-md bg-muted flex items-center justify-center relative group-hover:bg-muted/70">
-                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span className="text-xs font-medium">Apply Feature</span>
-                              </div>
+                          .map((feature) => (
+                            <div
+                              key={feature.id}
+                              className={cn(
+                                "relative rounded-lg bg-muted/50 border-2 transition-all cursor-pointer overflow-hidden",
+                                "hover:border-primary/50 hover:bg-muted/70",
+                                selectedFeatureId === feature.id ? "border-primary" : "border-transparent"
+                              )}
+                              style={{ aspectRatio: '1' }}
+                              onClick={() => {
+                                setSelectedFeatureId(feature.id);
+                              }}
+                            >
+                              <img 
+                                src={feature.url}
+                                alt={`${feature.category} type ${feature.type}`}
+                                className="w-full h-full object-contain p-2"
+                                onError={(e) => {
+                                  console.error(`Failed to load image: ${feature.url}`);
+                                  e.currentTarget.src = '/placeholder-image.png';
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                              {selectedFeatureId === feature.id && (
+                                <div className="absolute top-2 right-2">
+                                  <Check className="h-4 w-4 text-primary" />
+                                </div>
+                              )}
                             </div>
-                            <div className="w-full text-sm truncate text-center">
-                              {feature.name}
-                            </div>
-                          </Button>
-                        ))}
+                          ))
+                      ) : (
+                        <div className="col-span-2 text-center text-muted-foreground py-8">
+                          No features found {searchQuery && "for your search"}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

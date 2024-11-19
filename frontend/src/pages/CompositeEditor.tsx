@@ -16,7 +16,7 @@ import {
   ChevronsUpDown, ChevronsLeftRight,
   Search, Filter, X, Check
 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Slider } from "@/components/ui/slider"
 import {
   DropdownMenu,
@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { ModeToggle } from "@/components/mode-toggle"
 import api from '@/lib/api'
+import Canvas from '@/components/Canvas/Canvas'
 
 interface TransformSettings {
   face: {
@@ -53,6 +54,10 @@ interface FeatureItem {
   tags: string[]
   ethnicity?: string[]
   age?: string[]
+}
+
+interface CanvasRef {
+  addFeature: (feature: any) => void
 }
 
 export default function CompositeEditor() {
@@ -102,6 +107,8 @@ export default function CompositeEditor() {
   const [loading, setLoading] = useState(false)
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null)
 
+  const canvasRef = useRef<CanvasRef>(null)
+
   // Add useEffect to fetch features when category changes
   useEffect(() => {
     const fetchFeatures = async () => {
@@ -137,8 +144,9 @@ export default function CompositeEditor() {
     {
       id: "1",
       name: "Almond Eyes",
-      preview: "",
+      url: "https://res.cloudinary.com/daeayoeiq/image/upload/v1731910795/eyes_type_2_ml0aw3.png",
       category: "Eyes",
+      type: 1,
       tags: ["Natural", "Common"],
       ethnicity: ["Asian", "Caucasian"],
       age: ["Young", "Middle"]
@@ -146,8 +154,9 @@ export default function CompositeEditor() {
     {
       id: "2",
       name: "Round Eyes",
-      preview: "",
+      url: "",
       category: "Eyes",
+      type: 2,
       tags: ["Wide", "Expressive"],
       ethnicity: ["Caucasian"],
       age: ["Young"]
@@ -801,24 +810,18 @@ export default function CompositeEditor() {
                             <div
                               key={feature.id}
                               className={cn(
-                                "relative rounded-lg bg-muted/50 border-2 transition-all cursor-pointer overflow-hidden",
+                                "relative rounded-lg bg-muted/50 border-2 transition-all cursor-pointer",
                                 "hover:border-primary/50 hover:bg-muted/70",
                                 selectedFeatureId === feature.id ? "border-primary" : "border-transparent"
                               )}
                               style={{ aspectRatio: '1' }}
-                              onClick={() => {
-                                setSelectedFeatureId(feature.id);
-                              }}
+                              onClick={() => handleFeatureClick(feature)}
                             >
                               <img 
                                 src={feature.url}
                                 alt={`${feature.category} type ${feature.type}`}
                                 className="w-full h-full object-contain p-2"
-                                onError={(e) => {
-                                  console.error(`Failed to load image: ${feature.url}`);
-                                  e.currentTarget.src = '/placeholder-image.png';
-                                  e.currentTarget.style.display = 'none';
-                                }}
+                                draggable={false}
                               />
                               {selectedFeatureId === feature.id && (
                                 <div className="absolute top-2 right-2">
@@ -843,6 +846,29 @@ export default function CompositeEditor() {
         {/* Add other tool panels here */}
       </div>
     )
+  }
+
+  const handleFeatureDrop = (featureData: any) => {
+    console.log('Feature selected:', featureData)
+    if (canvasRef.current) {
+      canvasRef.current.addFeature(featureData)
+    }
+  }
+
+  const handleFeatureClick = (feature: any) => {
+    console.log('Feature clicked:', feature)
+    if (!feature.url) {
+      console.error('Feature URL is missing:', feature)
+      return
+    }
+    
+    if (canvasRef.current) {
+      canvasRef.current.addFeature({
+        id: feature.id,
+        url: feature.url,
+        category: feature.category.toLowerCase()
+      })
+    }
   }
 
   return (
@@ -1037,8 +1063,17 @@ export default function CompositeEditor() {
             {/* Canvas Content */}
             <div className="h-full pt-12 flex items-center justify-center">
               <div className="w-[512px] h-[512px] bg-background rounded-xl border shadow-md relative">
-                {/* Optional: Add grid overlay */}
-                <div className="absolute inset-0 bg-[url('/grid-overlay.svg')] opacity-5" />
+                <div className="absolute inset-0">
+                  <Canvas 
+                    ref={canvasRef}
+                    width={512}
+                    height={512}
+                    features={features}
+                    selectedFeatureId={selectedFeatureId}
+                    onFeatureSelect={(id) => setSelectedFeatureId(id)}
+                    onDrop={handleFeatureDrop}
+                  />
+                </div>
               </div>
             </div>
           </div>

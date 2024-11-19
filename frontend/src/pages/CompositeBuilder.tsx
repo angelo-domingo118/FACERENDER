@@ -34,6 +34,7 @@ import { Separator } from "@/components/ui/separator"
 import api from '@/lib/api'
 import axios from 'axios'
 import { useToast } from "@/hooks/use-toast"
+import PreviewCanvas from '@/components/Canvas/PreviewCanvas'
 
 interface Feature {
   id: string;
@@ -64,6 +65,7 @@ export default function CompositeBuilder() {
   const [features, setFeatures] = useState<Feature[]>([])
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
+  const [previewFeatures, setPreviewFeatures] = useState<Feature[]>([])
 
   const placeholderFeatures = Array(9).fill(null)
   const featureCategories: FeatureCategory[] = [
@@ -120,11 +122,21 @@ export default function CompositeBuilder() {
     navigate('/composite-editor')
   }
 
-  const handleFeatureSelect = () => {
+  const handleFeatureSelect = (feature: Feature) => {
     setSelectedFeatures(prev => ({
       ...prev,
       [currentFeature]: true
     }))
+    
+    setPreviewFeatures(prev => {
+      // Remove existing feature of same category
+      const filtered = prev.filter(f => f.category !== currentFeature)
+      return [...filtered, {
+        id: feature.id,
+        url: feature.url,
+        category: currentFeature
+      }]
+    })
   }
 
   const handleRefresh = () => {
@@ -307,7 +319,12 @@ export default function CompositeBuilder() {
                       style={{ aspectRatio: '1' }}
                       onClick={() => {
                         setSelectedFeatureId(feature.id);
-                        handleFeatureSelect();
+                        handleFeatureSelect({
+                          id: feature.id,
+                          url: feature.url,
+                          category: currentFeature,
+                          type: feature.type
+                        });
                       }}
                     >
                       <img 
@@ -402,18 +419,21 @@ export default function CompositeBuilder() {
         </div>
         
         <div className="flex-1 p-4">
-          <div 
-            className="h-full rounded-lg border-2 border-dashed border-muted bg-muted/5 overflow-hidden"
-          >
-            <div 
-              className="w-full h-full flex items-center justify-center transform-gpu"
-              style={{
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'center center',
-              }}
-            >
-              <span className="text-sm text-muted-foreground">Basic Preview</span>
-            </div>
+          <div className="h-full rounded-lg border-2 border-dashed border-muted bg-muted/5 overflow-hidden">
+            {previewFeatures.length > 0 ? (
+              <PreviewCanvas
+                width={300}
+                height={400}
+                features={previewFeatures}
+                zoom={zoom}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-sm text-muted-foreground">
+                  Select features to preview
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -460,19 +480,20 @@ export default function CompositeBuilder() {
 
           {/* Preview Content */}
           <div className="relative aspect-[3/4] w-full overflow-hidden">
-            <div 
-              className="absolute inset-0 flex items-center justify-center bg-muted/5"
-              style={{
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'center center',
-                minHeight: `${100 / (zoom / 100)}%`,
-                minWidth: `${100 / (zoom / 100)}%`,
-              }}
-            >
-              <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-muted m-4 rounded-lg">
-                <span className="text-sm text-muted-foreground">Basic Preview</span>
+            {previewFeatures.length > 0 ? (
+              <PreviewCanvas
+                width={600}
+                height={800}
+                features={previewFeatures}
+                zoom={zoom}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-sm text-muted-foreground">
+                  Select features to preview
+                </span>
               </div>
-            </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

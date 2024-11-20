@@ -374,50 +374,50 @@ export default function CompositeBuilder() {
       {/* Right Panel - Fixed width */}
       <div className="w-80 flex-shrink-0 border-l bg-muted/5 flex flex-col">
         <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <span className="font-medium">Preview</span>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7"
-                onClick={() => setShowPreviewDialog(true)}
-              >
-                <Maximize2 className="h-3 w-3" />
-              </Button>
-            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7"
+              onClick={() => setShowPreviewDialog(true)}
+            >
+              <Maximize2 className="h-3 w-3" />
+            </Button>
           </div>
-          <div className="flex items-center gap-2 mt-2">
+          {/* Horizontal Zoom Controls for Preview Panel */}
+          <div className="mt-3 flex items-center gap-2">
             <Button 
               variant="outline" 
               size="icon" 
               className="h-7 w-7"
-              onClick={() => setZoom(Math.max(50, zoom - 10))}
+              onClick={() => setZoom(Math.max(25, zoom - 10))}
             >
               <ZoomOut className="h-3 w-3" />
             </Button>
-            <div className="flex-1">
+            <div className="flex items-center bg-muted rounded-md px-2 flex-1">
               <Input 
                 type="number" 
                 value={zoom}
-                onChange={(e) => setZoom(Math.min(150, Math.max(50, Number(e.target.value))))}
-                className="h-7 text-center"
-                min={50}
-                max={150}
+                onChange={(e) => setZoom(Math.min(200, Math.max(25, Number(e.target.value))))}
+                className="h-7 text-center border-0 bg-transparent text-sm"
+                min={25}
+                max={200}
                 step={10}
               />
+              <span className="text-xs text-muted-foreground ml-1">%</span>
             </div>
             <Button 
               variant="outline" 
               size="icon" 
               className="h-7 w-7"
-              onClick={() => setZoom(Math.min(150, zoom + 10))}
+              onClick={() => setZoom(Math.min(200, zoom + 10))}
             >
               <ZoomIn className="h-3 w-3" />
             </Button>
           </div>
         </div>
-        
+
         <div className="flex-1 p-4">
           <div className="h-full rounded-lg border-2 border-dashed border-muted bg-muted/5 overflow-hidden">
             {previewFeatures.length > 0 ? (
@@ -440,60 +440,65 @@ export default function CompositeBuilder() {
 
       {/* Preview Dialog */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-        <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-w-[90vw] max-h-[90vh] p-0 bg-background rounded-lg border shadow-lg overflow-hidden">
-          {/* Header with controls */}
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-background rounded-lg border shadow-lg overflow-hidden">
+          {/* Header with title */}
           <div className="border-b p-4">
             <div className="flex items-center justify-between">
               <DialogTitle>Preview</DialogTitle>
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-8 w-8"
-                  onClick={() => setZoom(Math.max(50, zoom - 10))}
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <div className="flex items-center bg-muted rounded-md px-2">
-                  <Input 
-                    type="number" 
-                    value={zoom}
-                    onChange={(e) => setZoom(Math.min(150, Math.max(50, Number(e.target.value))))}
-                    className="h-8 w-16 text-center border-0 bg-transparent"
-                    min={50}
-                    max={150}
-                    step={10}
-                  />
-                  <span className="text-sm text-muted-foreground">%</span>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-8 w-8"
-                  onClick={() => setZoom(Math.min(150, zoom + 10))}
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-              </div>
             </div>
           </div>
 
           {/* Preview Content */}
-          <div className="relative aspect-[3/4] w-full overflow-hidden">
-            {previewFeatures.length > 0 ? (
-              <PreviewCanvas
-                width={600}
-                height={800}
-                features={previewFeatures}
-                zoom={zoom}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-sm text-muted-foreground">
-                  Select features to preview
-                </span>
+          <div className="w-full h-[calc(90vh-80px)] overflow-hidden relative">
+            {/* Centered Zoom Controls */}
+            <div className="absolute left-1/2 bottom-6 -translate-x-1/2 z-10 flex items-center gap-2 bg-background/95 p-2 rounded-lg border shadow-lg">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setZoom(Math.max(25, zoom - 10))}
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center bg-muted rounded-md px-2">
+                <Input 
+                  type="number" 
+                  value={zoom}
+                  onChange={(e) => setZoom(Math.min(200, Math.max(25, Number(e.target.value))))}
+                  className="h-8 w-16 text-center border-0 bg-transparent"
+                  min={25}
+                  max={200}
+                  step={10}
+                />
+                <span className="text-sm text-muted-foreground ml-1">%</span>
               </div>
-            )}
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setZoom(Math.min(200, zoom + 10))}
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Canvas */}
+            <div className="h-full">
+              {previewFeatures.length > 0 ? (
+                <PreviewCanvas
+                  width={window.innerWidth * 0.9}
+                  height={window.innerHeight * 0.9 - 80}
+                  features={previewFeatures}
+                  zoom={zoom}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-sm text-muted-foreground">
+                    Select features to preview
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

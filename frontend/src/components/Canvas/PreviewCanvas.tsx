@@ -1,25 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
-import { Stage, Layer, Image as KonvaImage } from 'react-konva';
+import { useEffect, useState } from 'react';
+import { Stage, Layer, Image as KonvaImage, Circle } from 'react-konva';
 import { detectFaceLandmarks, getFeaturePosition } from '@/lib/faceLandmarks';
 
-// Relative positioning for facial features
-const defaultPosition = {
-  faceShape: { x: 0.5, y: 0.5, scale: 1 },
-  eyes: { x: 0.5, y: 0.4, scale: 0.5 },
-  eyebrows: { x: 0.5, y: 0.35, scale: 0.5 },
-  nose: { x: 0.5, y: 0.55, scale: 0.4 },
-  mouth: { x: 0.5, y: 0.7, scale: 0.4 },
-  ears: { x: 0.5, y: 0.5, scale: 0.6 }
+interface LandmarkPoint {
+  x: number;
+  y: number;
+  category: string;
 }
 
 export default function PreviewCanvas({ width, height, features, zoom = 100 }) {
   const [images, setImages] = useState<Record<string, HTMLImageElement>>({});
-  const [positions, setPositions] = useState(defaultPosition);
-  
+  const [landmarks, setLandmarks] = useState<LandmarkPoint[]>([]);
+  const [stageScale, setStageScale] = useState(1);
+
   useEffect(() => {
     const loadImages = async () => {
       const loadedImages: Record<string, HTMLImageElement> = {};
-      
+
       for (const feature of features) {
         const img = new Image();
         img.crossOrigin = 'anonymous';
@@ -30,27 +27,41 @@ export default function PreviewCanvas({ width, height, features, zoom = 100 }) {
 
       setImages(loadedImages);
 
-      // Calculate positions based on face shape
+      // Only detect landmarks when face shape is loaded
       if (loadedImages.faceShape) {
         try {
-          const landmarks = await detectFaceLandmarks(loadedImages.faceShape);
-          if (landmarks) {
-            const newPositions = {};
-            for (const feature of features) {
-              if (feature.category === 'faceShape') {
-                newPositions[feature.category] = {
-                  x: width / 2,
-                  y: height / 2,
-                  scale: 1
-                };
-              } else {
-                const pos = getFeaturePosition(landmarks, feature.category);
-                if (pos) {
-                  newPositions[feature.category] = pos;
+          const detectedLandmarks = await detectFaceLandmarks(loadedImages.faceShape);
+          if (detectedLandmarks) {
+            const predictedPoints: LandmarkPoint[] = [];
+            
+            // Get predicted positions for each feature
+            const featureCategories = ['eyes', 'eyebrows', 'nose', 'mouth', 'ears'];
+            featureCategories.forEach(category => {
+              const pos = getFeaturePosition(detectedLandmarks, category);
+              if (pos) {
+                if (category === 'ears') {
+                  // Add both ear positions
+                  predictedPoints.push({
+                    x: pos.left.x * width,
+                    y: pos.left.y * height,
+                    category: 'leftEar'
+                  });
+                  predictedPoints.push({
+                    x: pos.right.x * width,
+                    y: pos.right.y * height,
+                    category: 'rightEar'
+                  });
+                } else {
+                  predictedPoints.push({
+                    x: pos.x * width,
+                    y: pos.y * height,
+                    category
+                  });
                 }
               }
-            }
-            setPositions(newPositions);
+            });
+
+            setLandmarks(predictedPoints);
           }
         } catch (error) {
           console.error('Error detecting landmarks:', error);
@@ -61,58 +72,39 @@ export default function PreviewCanvas({ width, height, features, zoom = 100 }) {
     loadImages();
   }, [features, width, height]);
 
-  const renderFeature = (feature: any) => {
-    const image = images[feature.category];
-    const position = positions[feature.category];
-    
-    if (!image || !position) return null;
-
-    // Special handling for ears
-    if (feature.category === 'ears' && position.left && position.right) {
-      return (
-        <>
-          <KonvaImage
-            key={`${feature.id}-left`}
-            image={image}
-            x={position.left.x * width}
-            y={position.left.y * height}
-            offsetX={image.width / 2}
-            offsetY={image.height / 2}
-            scaleX={(position.scale * zoom) / 100}
-            scaleY={(position.scale * zoom) / 100}
-          />
-          <KonvaImage
-            key={`${feature.id}-right`}
-            image={image}
-            x={position.right.x * width}
-            y={position.right.y * height}
-            offsetX={image.width / 2}
-            offsetY={image.height / 2}
-            scaleX={-(position.scale * zoom) / 100} // Flip for right ear
-            scaleY={(position.scale * zoom) / 100}
-          />
-        </>
-      );
-    }
-
-    return (
-      <KonvaImage
-        key={feature.id}
-        image={image}
-        x={position.x * width}
-        y={position.y * height}
-        offsetX={image.width / 2}
-        offsetY={image.height / 2}
-        scaleX={(position.scale * zoom) / 100}
-        scaleY={(position.scale * zoom) / 100}
-      />
-    );
-  };
+  useEffect(() => {
+    setStageScale(zoom / 100);
+  }, [zoom]);
 
   return (
-    <Stage width={width} height={height}>
+    <Stage 
+      width={width} 
+      height={height}
+      scaleX={stageScale}
+      scaleY={stageScale}
+    >
       <Layer>
-        {features.map(renderFeature)}
+        {/* Render images */}
+        {Object.entries(images).map(([category, img]) => (
+          <KonvaImage
+            key={category}
+            image={img}
+            width={width}
+            height={height}
+          />
+        ))}
+        
+        {/* Render landmark points */}
+        {landmarks.map((point, index) => (
+          <Circle
+            key={`${point.category}-${index}`}
+            x={point.x}
+            y={point.y}
+            radius={4}
+            fill="red"
+            opacity={0.7}
+          />
+        ))}
       </Layer>
     </Stage>
   );

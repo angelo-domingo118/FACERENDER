@@ -1,4 +1,4 @@
-import * as facemesh from '@mediapipe/face_mesh';
+import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
 import * as tf from '@tensorflow/tfjs';
 
 // Mapping of facial features to MediaPipe landmark indices
@@ -19,20 +19,27 @@ const LANDMARK_MAPPINGS = {
   }
 };
 
-let detector: any = null;
+let model: faceLandmarksDetection.FaceLandmarksDetector | null = null;
 
 export async function detectFaceLandmarks(imageElement: HTMLImageElement) {
   try {
-    if (!detector) {
-      await tf.setBackend('webgl');
-      detector = await facemesh.createDetector({
-        runtime: 'tfjs',
-        modelType: 'full'
-      });
+    if (!model) {
+      model = await faceLandmarksDetection.load(
+        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh
+      );
     }
-    
-    const faces = await detector.estimateFaces(imageElement);
-    return faces[0]?.keypoints || null;
+
+    const predictions = await model.estimateFaces({
+      input: imageElement,
+      returnTensors: false,
+      flipHorizontal: false,
+      predictIrises: false
+    });
+
+    if (predictions.length > 0) {
+      return predictions[0].scaledMesh;
+    }
+    return null;
   } catch (error) {
     console.error('Face detection error:', error);
     return null;

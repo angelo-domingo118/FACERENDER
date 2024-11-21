@@ -45,10 +45,41 @@ interface Feature {
 
 type FeatureCategory = 'faceShape' | 'nose' | 'mouth' | 'eyes' | 'eyebrows' | 'ears';
 
+const FeaturePreview = ({ feature, gridZoom }: { feature: Feature; gridZoom: number }) => {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = feature.url;
+    img.onload = () => setImage(img);
+  }, [feature.url]);
+
+  if (!image) {
+    return (
+      <div className="w-full h-full bg-muted/50 animate-pulse" />
+    );
+  }
+
+  return (
+    <div className="w-full h-full relative overflow-hidden">
+      <img 
+        src={feature.url}
+        alt={feature.category}
+        className="absolute w-full h-full object-cover transition-transform duration-200"
+        style={{
+          objectFit: 'cover',
+          objectPosition: 'center',
+          transform: `scale(${gridZoom / 100})`
+        }}
+      />
+    </div>
+  );
+};
+
 export default function CompositeBuilder() {
   const navigate = useNavigate()
   const [currentFeature, setCurrentFeature] = useState<FeatureCategory>('faceShape')
-  const [zoom, setZoom] = useState(100)
+  const [zoom, setZoom] = useState(300)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [progress, setProgress] = useState(0)
   const [selectedFeatures, setSelectedFeatures] = useState<Record<FeatureCategory, boolean>>({
@@ -66,6 +97,7 @@ export default function CompositeBuilder() {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
   const [previewFeatures, setPreviewFeatures] = useState<Feature[]>([])
+  const [gridZoom, setGridZoom] = useState(150)
 
   const placeholderFeatures = Array(9).fill(null)
   const featureCategories: FeatureCategory[] = [
@@ -129,13 +161,28 @@ export default function CompositeBuilder() {
     }))
     
     setPreviewFeatures(prev => {
-      // Remove existing feature of same category
-      const filtered = prev.filter(f => f.category !== currentFeature)
-      return [...filtered, {
-        id: feature.id,
-        url: feature.url,
-        category: currentFeature
-      }]
+      if (currentFeature === 'faceShape') {
+        // If changing face shape, keep other features but update face shape
+        const otherFeatures = prev.filter(f => f.category !== 'faceShape')
+        return [
+          {
+            id: feature.id,
+            url: feature.url,
+            category: currentFeature,
+            type: feature.type
+          },
+          ...otherFeatures
+        ]
+      } else {
+        // For other features, keep existing behavior
+        const filtered = prev.filter(f => f.category !== currentFeature)
+        return [...filtered, {
+          id: feature.id,
+          url: feature.url,
+          category: currentFeature,
+          type: feature.type
+        }]
+      }
     })
   }
 
@@ -296,7 +343,30 @@ export default function CompositeBuilder() {
         <ScrollArea className="flex-1">
           <div className="p-6">
             <div className="mb-6">
-              <h3 className="text-sm font-medium mb-3">Recommended Features</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium">Recommended Features</h3>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="h-6 w-6"
+                    onClick={() => setGridZoom(Math.max(100, gridZoom - 20))}
+                  >
+                    <ZoomOut className="h-3 w-3" />
+                  </Button>
+                  <span className="text-xs text-muted-foreground w-8 text-center">
+                    {gridZoom}%
+                  </span>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="h-6 w-6"
+                    onClick={() => setGridZoom(Math.min(200, gridZoom + 20))}
+                  >
+                    <ZoomIn className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
               <div className="grid grid-cols-3 gap-4 p-4">
                 {loading ? (
                   // Loading placeholders
@@ -327,19 +397,15 @@ export default function CompositeBuilder() {
                         });
                       }}
                     >
-                      <img 
-                        src={feature.url}
-                        alt={`${currentFeature} type ${feature.type}`}
-                        className="w-full h-full object-contain p-2"
-                        onError={(e) => {
-                          console.error(`Failed to load image: ${feature.url}`);
-                          e.currentTarget.src = '/placeholder-image.png';
-                          e.currentTarget.style.display = 'none';
-                        }}
+                      <FeaturePreview 
+                        feature={feature} 
+                        gridZoom={gridZoom} 
                       />
                       {selectedFeatureId === feature.id && (
-                        <div className="absolute top-2 right-2">
-                          <Check className="h-4 w-4 text-primary" />
+                        <div className="absolute top-2 right-2 z-10">
+                          <div className="bg-primary text-primary-foreground rounded-full p-1">
+                            <Check className="h-3 w-3" />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -391,7 +457,7 @@ export default function CompositeBuilder() {
               variant="outline" 
               size="icon" 
               className="h-7 w-7"
-              onClick={() => setZoom(Math.max(25, zoom - 10))}
+              onClick={() => setZoom(Math.max(75, zoom - 30))}
             >
               <ZoomOut className="h-3 w-3" />
             </Button>
@@ -399,11 +465,11 @@ export default function CompositeBuilder() {
               <Input 
                 type="number" 
                 value={zoom}
-                onChange={(e) => setZoom(Math.min(200, Math.max(25, Number(e.target.value))))}
+                onChange={(e) => setZoom(Math.min(900, Math.max(75, Number(e.target.value))))}
                 className="h-7 text-center border-0 bg-transparent text-sm"
-                min={25}
-                max={200}
-                step={10}
+                min={75}
+                max={900}
+                step={30}
               />
               <span className="text-xs text-muted-foreground ml-1">%</span>
             </div>
@@ -411,7 +477,7 @@ export default function CompositeBuilder() {
               variant="outline" 
               size="icon" 
               className="h-7 w-7"
-              onClick={() => setZoom(Math.min(200, zoom + 10))}
+              onClick={() => setZoom(Math.min(900, zoom + 30))}
             >
               <ZoomIn className="h-3 w-3" />
             </Button>
@@ -456,7 +522,7 @@ export default function CompositeBuilder() {
                 variant="outline" 
                 size="icon" 
                 className="h-8 w-8"
-                onClick={() => setZoom(Math.max(25, zoom - 10))}
+                onClick={() => setZoom(Math.max(75, zoom - 30))}
               >
                 <ZoomOut className="h-4 w-4" />
               </Button>
@@ -464,11 +530,11 @@ export default function CompositeBuilder() {
                 <Input 
                   type="number" 
                   value={zoom}
-                  onChange={(e) => setZoom(Math.min(200, Math.max(25, Number(e.target.value))))}
+                  onChange={(e) => setZoom(Math.min(900, Math.max(75, Number(e.target.value))))}
                   className="h-8 w-16 text-center border-0 bg-transparent"
-                  min={25}
-                  max={200}
-                  step={10}
+                  min={75}
+                  max={900}
+                  step={30}
                 />
                 <span className="text-sm text-muted-foreground ml-1">%</span>
               </div>
@@ -476,7 +542,7 @@ export default function CompositeBuilder() {
                 variant="outline" 
                 size="icon" 
                 className="h-8 w-8"
-                onClick={() => setZoom(Math.min(200, zoom + 10))}
+                onClick={() => setZoom(Math.min(900, zoom + 30))}
               >
                 <ZoomIn className="h-4 w-4" />
               </Button>

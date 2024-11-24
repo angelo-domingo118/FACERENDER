@@ -1,6 +1,7 @@
 import { Stage, Layer, Image } from 'react-konva'
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { KonvaEventObject } from 'konva/lib/Node'
+import Konva from 'konva'
 
 interface CanvasProps {
   width: number
@@ -15,11 +16,71 @@ interface CanvasProps {
   disableDragging?: boolean
 }
 
+interface CanvasRef {
+  addFeature: (feature: any) => void
+  moveFeature: (featureType: string, deltaX: number, deltaY: number) => void
+  rotateFeature: (featureType: string, angle: number) => void
+  scaleFeature: (featureType: string, scaleX: number, scaleY: number) => void
+}
+
 const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
   const { width, height, layers, zoom } = props
   const stageRef = useRef<Konva.Stage>(null)
   const layerRef = useRef<Konva.Layer>(null)
   const imagesRef = useRef<Map<string, Konva.Image>>(new Map())
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    addFeature: (feature: any) => {
+      // Existing addFeature logic
+    },
+    moveFeature: (featureType: string, deltaX: number, deltaY: number) => {
+      // Find the layer with matching feature type (case-insensitive)
+      const targetLayer = Array.from(imagesRef.current.entries()).find(
+        ([_, image]) => image.id().toLowerCase().includes(featureType.toLowerCase())
+      );
+
+      if (targetLayer) {
+        const [_, image] = targetLayer;
+        // Apply movement
+        image.x(image.x() + deltaX);
+        image.y(image.y() + deltaY);
+        layerRef.current?.batchDraw();
+      }
+    },
+    rotateFeature: (featureType: string, angle: number) => {
+      const targetLayer = Array.from(imagesRef.current.entries()).find(
+        ([_, image]) => image.id().toLowerCase().includes(featureType.toLowerCase())
+      );
+
+      if (targetLayer) {
+        const [_, image] = targetLayer;
+        // Apply rotation
+        image.rotation(image.rotation() + angle);
+        layerRef.current?.batchDraw();
+      }
+    },
+    scaleFeature: (featureType: string, scaleX: number, scaleY: number) => {
+      const targetLayer = Array.from(imagesRef.current.entries()).find(
+        ([_, image]) => image.id().toLowerCase().includes(featureType.toLowerCase())
+      );
+
+      if (targetLayer) {
+        const [_, image] = targetLayer;
+        // Get current scale
+        const currentScaleX = image.scaleX();
+        const currentScaleY = image.scaleY();
+        
+        // Apply new scale
+        image.scale({
+          x: currentScaleX * scaleX,
+          y: currentScaleY * scaleY
+        });
+        
+        layerRef.current?.batchDraw();
+      }
+    }
+  }))
 
   useEffect(() => {
     if (!layerRef.current) return
@@ -76,7 +137,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
             image: image,
             opacity: layer.opacity / 100,
             draggable: false,
-            id: layer.id,
+            id: `${layer.feature.category.toLowerCase()}_${layer.id}`,
             x: width / 2,
             y: height / 2,
             width: image.width,

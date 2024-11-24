@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
+import { analyzeAndBlendFeature } from '@/lib/colorBlending';
 
 interface Feature {
   id: string;
@@ -15,17 +16,26 @@ export default function PreviewCanvas({ width, height, features, zoom = 100 }) {
 
   useEffect(() => {
     const loadImages = async () => {
+      console.log('Loading images for features:', features);
       const loadedImages: Record<string, HTMLImageElement> = {};
       
       for (const feature of features) {
+        console.log('Loading feature:', feature);
         const img = new Image();
         img.src = feature.url;
         await new Promise((resolve) => {
-          img.onload = resolve;
+          img.onload = () => {
+            console.log('Loaded image for:', feature.category, {
+              width: img.width,
+              height: img.height
+            });
+            resolve(null);
+          };
         });
         loadedImages[feature.category] = img;
       }
       
+      console.log('All images loaded:', Object.keys(loadedImages));
       setImages(loadedImages);
     };
 

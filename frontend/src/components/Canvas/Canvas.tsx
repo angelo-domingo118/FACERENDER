@@ -1,144 +1,121 @@
-import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva'
-import { forwardRef, useEffect, useRef, useState, useImperativeHandle, useCallback } from 'react'
+import { Stage, Layer, Image } from 'react-konva'
+import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { KonvaEventObject } from 'konva/lib/Node'
-import ErrorBoundary from '@/components/ErrorBoundary'
-
-interface FeaturePosition {
-  id: string
-  x: number
-  y: number
-  scale: number
-  rotation: number
-  url: string
-  category: string
-  width?: number
-  height?: number
-}
 
 interface CanvasProps {
-  width?: number
-  height?: number
-  features: Array<{
-    id: string
-    url: string
-    category: string
-    type: number
-  }>
-  onFeatureSelect?: (id: string) => void
-  selectedFeatureId?: string | null
-  onDrop?: (feature: any) => void
-}
-
-export interface CanvasRef {
-  addFeature: (feature: {
-    id: string
-    url: string
-    category: string
-    position?: { x: number; y: number }
-  }) => void
-}
-
-const logError = (error: any, context: string) => {
-  console.error(`[Canvas] ${context}:`, error)
-}
-
-const logInfo = (message: string, data?: any) => {
-  console.log(`[Canvas] ${message}`, data || '')
+  width: number
+  height: number
+  layers: Layer[]
+  zoom: number
+  selectedFeatureId: string | null
+  onFeatureSelect: (id: string) => void
+  onDrop: (feature: any) => void
+  initialZoom: number
+  initialFeatures: Feature[]
+  disableDragging?: boolean
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
-  const [featurePositions, setFeaturePositions] = useState<FeaturePosition[]>([])
-  const [loadedImages, setLoadedImages] = useState<{ [key: string]: HTMLImageElement }>({})
-  
-  useImperativeHandle(ref, () => ({
-    addFeature: (feature: {
-      id: string
-      url: string
-      category: string
-      position?: { x: number; y: number }
-    }) => {
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-      img.onload = () => {
-        const maxSize = 150
-        const scale = Math.min(maxSize / img.width, maxSize / img.height)
-        const width = img.width * scale
-        const height = img.height * scale
+  const { width, height, layers, zoom } = props
+  const stageRef = useRef<Konva.Stage>(null)
+  const layerRef = useRef<Konva.Layer>(null)
+  const imagesRef = useRef<Map<string, Konva.Image>>(new Map())
 
-        const position = feature.position || { 
-          x: props.width ? props.width / 2 : 256,
-          y: props.height ? props.height / 2 : 256
-        }
-
-        const newPosition: FeaturePosition = {
-          id: feature.id,
-          url: feature.url,
-          category: feature.category,
-          x: position.x,
-          y: position.y,
-          scale: 1,
-          rotation: 0,
-          width,
-          height
-        }
-
-        setLoadedImages(prev => ({ ...prev, [feature.url]: img }))
-        setFeaturePositions(prev => [...prev, newPosition])
-      }
-      img.onerror = (error) => {
-        console.error('Failed to load image:', feature.url, error)
-      }
-      img.src = feature.url
-    }
-  }))
-
-  const renderFeature = useCallback((position: FeaturePosition) => {
-    const image = loadedImages[position.url]
+  useEffect(() => {
+    if (!layerRef.current) return
     
-    if (!image) {
-      console.log('Image not loaded yet for:', position.category)
-      return null
-    }
+    // Sort layers by zIndex
+    const sortedLayers = [...layers].sort((a, b) => a.zIndex - b.zIndex)
 
-    return (
-      <KonvaImage
-        key={position.id}
-        image={image}
-        x={position.x}
-        y={position.y}
-        width={position.width}
-        height={position.height}
-        offsetX={position.width ? position.width / 2 : 0}
-        offsetY={position.height ? position.height / 2 : 0}
-        scaleX={position.scale}
-        scaleY={position.scale}
-        rotation={position.rotation}
-        draggable
-        onDragEnd={(e: KonvaEventObject<DragEvent>) => {
-          const pos = e.target.position()
-          setFeaturePositions(prev => 
-            prev.map(p => p.id === position.id ? {...p, x: pos.x, y: pos.y} : p)
-          )
-        }}
-      />
-    )
-  }, [loadedImages])
+    // Handle removed layers
+    const currentIds = new Set(sortedLayers.map(l => l.id))
+    imagesRef.current.forEach((_, id) => {
+      if (!currentIds.has(id)) {
+        imagesRef.current.get(id)?.destroy()
+        imagesRef.current.delete(id)
+      }
+    })
 
-  // Add dimensions check with default values
-  const width = props.width || 512
-  const height = props.height || 512
+    // Update or add layers
+    sortedLayers.forEach(layer => {
+      if (!layer.visible) {
+        // Hide existing image if it exists
+        const existingImage = imagesRef.current.get(layer.id)
+        if (existingImage) {
+          existingImage.hide()
+        }
+        return
+      }
+
+      // Check if image already exists
+      const existingImage = imagesRef.current.get(layer.id)
+      if (existingImage) {
+        // Update existing image properties
+        const scaleX = width / existingImage.width()
+        const scaleY = height / existingImage.height()
+        const scale = Math.min(scaleX, scaleY) * (zoom / 100)
+        const paddingFactor = 0.95
+
+        existingImage.setAttrs({
+          opacity: layer.opacity / 100,
+          scaleX: scale * paddingFactor,
+          scaleY: scale * paddingFactor,
+          visible: true
+        })
+      } else {
+        // Create new image only if it doesn't exist
+        const image = new window.Image()
+        image.src = layer.feature.url
+        image.onload = () => {
+          const scaleX = width / image.width
+          const scaleY = height / image.height
+          const scale = Math.min(scaleX, scaleY) * (zoom / 100)
+          const paddingFactor = 0.95
+
+          const imageNode = new Konva.Image({
+            image: image,
+            opacity: layer.opacity / 100,
+            draggable: false,
+            id: layer.id,
+            x: width / 2,
+            y: height / 2,
+            width: image.width,
+            height: image.height,
+            scaleX: scale * paddingFactor,
+            scaleY: scale * paddingFactor,
+            offsetX: image.width / 2,
+            offsetY: image.height / 2,
+          })
+          
+          layerRef.current?.add(imageNode)
+          imagesRef.current.set(layer.id, imageNode)
+          layerRef.current?.batchDraw()
+        }
+      }
+    })
+
+    // Ensure proper layer order
+    sortedLayers.forEach(layer => {
+      const image = imagesRef.current.get(layer.id)
+      if (image) {
+        image.moveToTop()
+      }
+    })
+
+    layerRef.current.batchDraw()
+  }, [layers, zoom, width, height])
 
   return (
-    <ErrorBoundary fallback={<div>Error loading canvas</div>}>
-      <Stage width={width} height={height}>
-        <Layer>
-          {featurePositions.map(renderFeature)}
-        </Layer>
-      </Stage>
-    </ErrorBoundary>
+    <Stage
+      ref={stageRef}
+      width={width}
+      height={height}
+      draggable={false}
+    >
+      <Layer ref={layerRef} listening={false} />
+    </Stage>
   )
 })
 
 Canvas.displayName = 'Canvas'
-
 export default Canvas 

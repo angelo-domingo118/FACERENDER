@@ -35,6 +35,7 @@ import api from '@/lib/api'
 import axios from 'axios'
 import { useToast } from "@/hooks/use-toast"
 import PreviewCanvas from '@/components/Canvas/PreviewCanvas'
+import { analyzeSkinTone, blendFeatures } from '@/lib/colorMatching';
 
 interface Feature {
   id: string;
@@ -150,41 +151,70 @@ export default function CompositeBuilder() {
   }
 
   const handleFinish = () => {
-    console.log('Navigating to editor...')
-    navigate('/composite-editor')
+    console.log('Navigating to editor with features:', previewFeatures)
+    navigate('/composite-editor', { 
+      state: { 
+        features: previewFeatures,
+        zoom: zoom
+      } 
+    })
   }
 
-  const handleFeatureSelect = (feature: Feature) => {
+  const handleFeatureSelect = async (feature: Feature) => {
+    console.log('Feature selected:', { feature, currentFeature });
+    
     setSelectedFeatures(prev => ({
       ...prev,
       [currentFeature]: true
-    }))
+    }));
     
-    setPreviewFeatures(prev => {
-      if (currentFeature === 'faceShape') {
-        // If changing face shape, keep other features but update face shape
-        const otherFeatures = prev.filter(f => f.category !== 'faceShape')
-        return [
-          {
-            id: feature.id,
-            url: feature.url,
-            category: currentFeature,
-            type: feature.type
-          },
-          ...otherFeatures
-        ]
-      } else {
-        // For other features, keep existing behavior
-        const filtered = prev.filter(f => f.category !== currentFeature)
-        return [...filtered, {
-          id: feature.id,
-          url: feature.url,
-          category: currentFeature,
-          type: feature.type
-        }]
-      }
-    })
-  }
+    try {
+      setPreviewFeatures(prev => {
+        console.log('Current preview features:', prev);
+        
+        if (currentFeature === 'faceShape') {
+          const otherFeatures = prev.filter(f => f.category !== 'faceShape');
+          const newFeatures = [
+            {
+              ...feature,
+              isBase: true
+            },
+            ...otherFeatures
+          ];
+          console.log('Updated features with face shape:', newFeatures);
+          return newFeatures;
+        } else {
+          const faceShape = prev.find(f => f.category === 'faceShape');
+          if (!faceShape) {
+            toast({
+              title: "Face shape required",
+              description: "Please select a face shape first",
+              variant: "destructive"
+            });
+            return prev;
+          }
+
+          const filtered = prev.filter(f => f.category !== currentFeature);
+          const newFeatures = [...filtered, {
+            ...feature,
+            needsBlending: true,
+            blendSettings: {
+              category: currentFeature
+            }
+          }];
+          console.log('Updated features with new component:', newFeatures);
+          return newFeatures;
+        }
+      });
+    } catch (error) {
+      console.error('Error processing feature:', error);
+      toast({
+        title: "Error processing feature",
+        description: "Failed to analyze and blend feature colors",
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleRefresh = () => {
     // Frontend only - would normally fetch new set from backend

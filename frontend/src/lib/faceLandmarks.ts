@@ -22,23 +22,28 @@ const LANDMARK_MAPPINGS = {
 let model: faceLandmarksDetection.FaceLandmarksDetector | null = null;
 
 export async function detectFaceLandmarks(imageElement: HTMLImageElement) {
+  console.log('Detecting face landmarks for image:', imageElement.src);
   try {
     if (!model) {
+      console.log('Loading face landmarks model');
       model = await faceLandmarksDetection.load(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh
       );
+      console.log('Face landmarks model loaded');
     }
 
     const predictions = await model.estimateFaces({
       input: imageElement,
       returnTensors: false,
       flipHorizontal: false,
-      predictIrises: false
+      predictIrises: true
     });
 
     if (predictions.length > 0) {
+      console.log('Face landmarks detected');
       return predictions[0].scaledMesh;
     }
+    console.warn('No face landmarks detected');
     return null;
   } catch (error) {
     console.error('Face detection error:', error);

@@ -14,7 +14,10 @@ import {
   ArrowUpLeft, ArrowDownLeft, ArrowUpRight, ArrowDownRight,
   Maximize2, Minimize2,
   ChevronsUpDown, ChevronsLeftRight,
-  Search, Filter, X, Check
+  Search, Filter, X, Check,
+  MoveHorizontal, MoveVertical,
+  ArrowLeftRight,
+  CircleDot, SmilePlus, HeadphonesIcon, Minus, CircleUser,
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { Slider } from "@/components/ui/slider"
@@ -207,10 +210,10 @@ export default function CompositeEditor() {
       // Insert it at the new position
       newLayers.splice(hoverIndex, 0, draggedLayer)
       
-      // Update zIndex for all layers
+      // Update zIndex - higher index = lower layer
       return newLayers.map((layer, idx) => ({
         ...layer,
-        zIndex: newLayers.length - idx - 1 // Highest index = top layer
+        zIndex: idx // Bottom layer starts at 0
       }))
     })
   }
@@ -325,7 +328,56 @@ export default function CompositeEditor() {
 
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-6">
-                {/* Movement Controls */}
+                {/* Feature Selection - Improved icons */}
+                <div className="space-y-3">
+                  <span className="text-sm font-medium">Select Feature</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { 
+                        label: "Eyes", 
+                        value: "eyes",
+                        icon: <Eye className="h-4 w-4" /> 
+                      },
+                      { 
+                        label: "Nose", 
+                        value: "nose",
+                        icon: <CircleDot className="h-4 w-4" />
+                      },
+                      { 
+                        label: "Mouth", 
+                        value: "mouth",
+                        icon: <SmilePlus className="h-4 w-4" />
+                      },
+                      { 
+                        label: "Ears", 
+                        value: "ears",
+                        icon: <HeadphonesIcon className="h-4 w-4" />
+                      },
+                      { 
+                        label: "Eyebrows", 
+                        value: "eyebrows",
+                        icon: <Minus className="h-4 w-4" />
+                      },
+                      { 
+                        label: "Face Shape", 
+                        value: "faceShape",
+                        icon: <CircleUser className="h-4 w-4" />
+                      },
+                    ].map((feature) => (
+                      <Button
+                        key={feature.label}
+                        variant={selectedFeatureForMovement === feature.value ? "secondary" : "outline"}
+                        className="flex items-center justify-start gap-2 h-9"
+                        onClick={() => handleFeatureSelectionForMovement(feature.value)}
+                      >
+                        {feature.icon}
+                        <span className="text-sm">{feature.label}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Movement Controls - Existing code */}
                 <div className="space-y-3">
                   <span className="text-sm font-medium">Movement</span>
                   <div className="space-y-4">
@@ -344,105 +396,98 @@ export default function CompositeEditor() {
                       />
                     </div>
 
-                    {/* Feature Selection */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { label: "Eyes", icon: <Eye className="h-4 w-4" /> },
-                        { label: "Nose", icon: <StretchHorizontal className="h-4 w-4" /> },
-                        { label: "Mouth", icon: <StretchHorizontal className="h-4 w-4 rotate-180" /> },
-                        { label: "Ears", icon: <StretchVertical className="h-4 w-4" /> },
-                        { label: "Eyebrows", icon: <StretchHorizontal className="h-4 w-4" /> },
-                        { label: "Face Shape", icon: <Maximize2 className="h-4 w-4" /> },
-                      ].map((feature) => (
-                        <Button
-                          key={feature.label}
-                          variant={selectedFeatureForMovement === feature.label ? "secondary" : "outline"}
-                          className="h-9 justify-start gap-2"
-                          onClick={() => handleFeatureSelectionForMovement(feature.label)}
-                        >
-                          {feature.icon}
-                          <span className="text-sm">{feature.label}</span>
-                        </Button>
-                      ))}
-                    </div>
-
-                    {/* Movement Grid */}
+                    {/* Movement Grid - Improved UI with better center alignment */}
                     <div className="bg-muted/40 rounded-lg p-4">
                       <div className="grid grid-cols-3 gap-2 place-items-center">
+                        {/* Top Row */}
                         <Button 
-                          variant="secondary" 
+                          variant="outline"
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 aspect-square"
                           onClick={() => handleFeatureMovement('upLeft')}
                           disabled={!selectedFeatureForMovement}
                         >
-                          <ArrowUpLeft className="h-4 w-4" />
+                          <ArrowUpLeft className="h-5 w-5" />
                         </Button>
                         <Button 
-                          variant="secondary" 
+                          variant="outline"
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 aspect-square"
                           onClick={() => handleFeatureMovement('up')}
                           disabled={!selectedFeatureForMovement}
                         >
-                          <ArrowUp className="h-4 w-4" />
+                          <ArrowUp className="h-5 w-5" />
                         </Button>
                         <Button 
-                          variant="secondary" 
+                          variant="outline"
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 aspect-square"
                           onClick={() => handleFeatureMovement('upRight')}
                           disabled={!selectedFeatureForMovement}
                         >
-                          <ArrowUpRight className="h-4 w-4" />
+                          <ArrowUpRight className="h-5 w-5" />
                         </Button>
+
+                        {/* Middle Row */}
                         <Button 
-                          variant="secondary" 
+                          variant="outline"
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 aspect-square"
                           onClick={() => handleFeatureMovement('left')}
                           disabled={!selectedFeatureForMovement}
                         >
-                          <ArrowLeft className="h-4 w-4" />
+                          <ArrowLeft className="h-5 w-5" />
                         </Button>
-                        <div className="h-9 w-9 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
-                          <div className="h-2 w-2 rounded-full bg-muted-foreground/60" />
+                        {/* Center Position - Improved */}
+                        <div className="relative h-10 w-10">
+                          <div className="absolute inset-0 rounded-lg border-2 border-dashed border-muted-foreground/20" />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                          </div>
+                          <div className="absolute inset-0 flex items-center">
+                            <div className="w-full h-[1px] bg-muted-foreground/10" />
+                          </div>
+                          <div className="absolute inset-0 flex justify-center">
+                            <div className="h-full w-[1px] bg-muted-foreground/10" />
+                          </div>
                         </div>
                         <Button 
-                          variant="secondary" 
+                          variant="outline"
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 aspect-square"
                           onClick={() => handleFeatureMovement('right')}
                           disabled={!selectedFeatureForMovement}
                         >
-                          <ArrowRight className="h-4 w-4" />
+                          <ArrowRight className="h-5 w-5" />
                         </Button>
+
+                        {/* Bottom Row */}
                         <Button 
-                          variant="secondary" 
+                          variant="outline"
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 aspect-square"
                           onClick={() => handleFeatureMovement('downLeft')}
                           disabled={!selectedFeatureForMovement}
                         >
-                          <ArrowDownLeft className="h-4 w-4" />
+                          <ArrowDownLeft className="h-5 w-5" />
                         </Button>
                         <Button 
-                          variant="secondary" 
+                          variant="outline"
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 aspect-square"
                           onClick={() => handleFeatureMovement('down')}
                           disabled={!selectedFeatureForMovement}
                         >
-                          <ArrowDown className="h-4 w-4" />
+                          <ArrowDown className="h-5 w-5" />
                         </Button>
                         <Button 
-                          variant="secondary" 
+                          variant="outline"
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 aspect-square"
                           onClick={() => handleFeatureMovement('downRight')}
                           disabled={!selectedFeatureForMovement}
                         >
-                          <ArrowDownRight className="h-4 w-4" />
+                          <ArrowDownRight className="h-5 w-5" />
                         </Button>
                       </div>
                     </div>
@@ -484,132 +529,100 @@ export default function CompositeEditor() {
                   </div>
                 </div>
 
-                {/* Scale Controls */}
-                <div className="space-y-2 mb-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Scale Step Size</span>
-                    <span className="text-xs text-muted-foreground">{scaleStepSize * 100}%</span>
-                  </div>
-                  <Slider
-                    value={[scaleStepSize * 100]}
-                    min={1}
-                    max={50}
-                    step={1}
-                    onValueChange={([value]) => setScaleStepSize(value / 100)}
-                  />
-                  
-                  {/* Horizontal Scale */}
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleFeatureScale('horizontal', false)}
-                      disabled={!selectedFeatureForMovement}
-                    >
-                      <ChevronsLeftRight className="h-4 w-4 mr-2" />
-                      Scale In
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleFeatureScale('horizontal', true)}
-                      disabled={!selectedFeatureForMovement}
-                    >
-                      <ChevronsLeftRight className="h-4 w-4 mr-2" />
-                      Scale Out
-                    </Button>
-                  </div>
-
-                  {/* Vertical Scale */}
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleFeatureScale('vertical', false)}
-                      disabled={!selectedFeatureForMovement}
-                    >
-                      <ChevronsUpDown className="h-4 w-4 mr-2" />
-                      Scale In
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleFeatureScale('vertical', true)}
-                      disabled={!selectedFeatureForMovement}
-                    >
-                      <ChevronsUpDown className="h-4 w-4 mr-2" />
-                      Scale Out
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Stretch & Squeeze Controls */}
+                {/* Size Controls */}
                 <div className="space-y-3">
-                  <span className="text-sm font-medium">Stretch & Squeeze</span>
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Vertical */}
+                  <span className="text-sm font-medium">Size Adjustment</span>
+                  <div className="space-y-4">
+                    {/* Size Step Control */}
                     <div className="space-y-2">
-                      <span className="text-xs text-muted-foreground">Vertical</span>
-                      <div className="grid grid-cols-1 gap-2">
-                        <Button variant="secondary" size="sm" className="h-9">
-                          <ChevronsUpDown className="h-4 w-4 mr-2" />
-                          Stretch
-                        </Button>
-                        <Button variant="secondary" size="sm" className="h-9">
-                          <ChevronsUpDown className="h-4 w-4 mr-2 rotate-180" />
-                          Squeeze
-                        </Button>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Size Step</span>
+                        <span className="text-xs text-muted-foreground">{sizeStepSize}%</span>
                       </div>
+                      <Slider
+                        value={[sizeStepSize]}
+                        min={1}
+                        max={20}
+                        step={1}
+                        onValueChange={([value]) => setSizeStepSize(value)}
+                      />
                     </div>
 
-                    {/* Horizontal */}
-                    <div className="space-y-2">
-                      <span className="text-xs text-muted-foreground">Horizontal</span>
-                      <div className="grid grid-cols-1 gap-2">
-                        <Button variant="secondary" size="sm" className="h-9">
-                          <ChevronsLeftRight className="h-4 w-4 mr-2" />
-                          Stretch
-                        </Button>
-                        <Button variant="secondary" size="sm" className="h-9">
-                          <ChevronsLeftRight className="h-4 w-4 mr-2 rotate-180" />
-                          Squeeze
-                        </Button>
+                    {/* Size Control Buttons - Updated UI */}
+                    <div className="space-y-4">
+                      {/* Uniform Scaling */}
+                      <div className="space-y-2">
+                        <span className="text-xs text-muted-foreground">Uniform Scale</span>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="flex-1 h-9"
+                            onClick={() => handleFeatureSize('increase', 'both')}
+                            disabled={!selectedFeatureForMovement}
+                          >
+                            <Maximize2 className="h-4 w-4 mr-2" />
+                            Scale Up
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1 h-9"
+                            onClick={() => handleFeatureSize('decrease', 'both')}
+                            disabled={!selectedFeatureForMovement}
+                          >
+                            <Minimize2 className="h-4 w-4 mr-2" />
+                            Scale Down
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Pinch & Stretch Controls */}
-                <div className="space-y-3">
-                  <span className="text-sm font-medium">Pinch & Stretch</span>
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Upper Part */}
-                    <div className="space-y-2">
-                      <span className="text-xs text-muted-foreground">Upper Part</span>
-                      <div className="grid grid-cols-1 gap-2">
-                        <Button variant="secondary" size="sm" className="h-9">
-                          <ChevronsLeftRight className="h-4 w-4 mr-2 rotate-[-45deg]" />
-                          Pinch
-                        </Button>
-                        <Button variant="secondary" size="sm" className="h-9">
-                          <ChevronsLeftRight className="h-4 w-4 mr-2 rotate-[-45deg] scale-x-[-1]" />
-                          Stretch
-                        </Button>
+                      {/* Horizontal Scaling */}
+                      <div className="space-y-2">
+                        <span className="text-xs text-muted-foreground">Horizontal Scale</span>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="flex-1 h-9"
+                            onClick={() => handleFeatureSize('increase', 'horizontal')}
+                            disabled={!selectedFeatureForMovement}
+                          >
+                            <ChevronsLeftRight className="h-4 w-4 mr-2" />
+                            Widen
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1 h-9"
+                            onClick={() => handleFeatureSize('decrease', 'horizontal')}
+                            disabled={!selectedFeatureForMovement}
+                          >
+                            <ArrowLeftRight className="h-4 w-4 mr-2" />
+                            Narrow
+                          </Button>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Lower Part */}
-                    <div className="space-y-2">
-                      <span className="text-xs text-muted-foreground">Lower Part</span>
-                      <div className="grid grid-cols-1 gap-2">
-                        <Button variant="secondary" size="sm" className="h-9">
-                          <ChevronsLeftRight className="h-4 w-4 mr-2 rotate-45deg" />
-                          Pinch
-                        </Button>
-                        <Button variant="secondary" size="sm" className="h-9">
-                          <ChevronsLeftRight className="h-4 w-4 mr-2 rotate-45deg scale-x-[-1]" />
-                          Stretch
-                        </Button>
+                      {/* Vertical Scaling */}
+                      <div className="space-y-2">
+                        <span className="text-xs text-muted-foreground">Vertical Scale</span>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="flex-1 h-9"
+                            onClick={() => handleFeatureSize('increase', 'vertical')}
+                            disabled={!selectedFeatureForMovement}
+                          >
+                            <ChevronsUpDown className="h-4 w-4 mr-2" />
+                            Lengthen
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1 h-9"
+                            onClick={() => handleFeatureSize('decrease', 'vertical')}
+                            disabled={!selectedFeatureForMovement}
+                          >
+                            <ArrowUpDown className="h-4 w-4 mr-2" />
+                            Shorten
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -661,7 +674,7 @@ export default function CompositeEditor() {
                               <div className="flex items-center justify-between">
                                 <span className="text-sm capitalize">{key}</span>
                                 <span className="text-xs text-muted-foreground w-8 text-right">
-                                  {value}%
+                                  {(value * 100).toFixed(1)}%
                                 </span>
                               </div>
                               <Slider
@@ -693,7 +706,7 @@ export default function CompositeEditor() {
                               <div className="flex items-center justify-between">
                                 <span className="text-sm capitalize">{key}</span>
                                 <span className="text-xs text-muted-foreground w-8 text-right">
-                                  {value}%
+                                  {(value * 100).toFixed(1)}%
                                 </span>
                               </div>
                               <Slider
@@ -728,7 +741,7 @@ export default function CompositeEditor() {
                             <div className="flex items-center justify-between">
                               <span className="text-sm capitalize">{key}</span>
                               <span className="text-xs text-muted-foreground w-8 text-right">
-                                {value}%
+                                {(value * 100).toFixed(1)}%
                               </span>
                             </div>
                             <Slider
@@ -763,7 +776,7 @@ export default function CompositeEditor() {
                               <div className="flex items-center justify-between">
                                 <span className="text-sm capitalize">{key} Lip</span>
                                 <span className="text-xs text-muted-foreground w-8 text-right">
-                                  {value}%
+                                  {(value * 100).toFixed(1)}%
                                 </span>
                               </div>
                               <Slider
@@ -795,7 +808,7 @@ export default function CompositeEditor() {
                               <div className="flex items-center justify-between">
                                 <span className="text-sm capitalize">{key}</span>
                                 <span className="text-xs text-muted-foreground w-8 text-right">
-                                  {value}%
+                                  {(value * 100).toFixed(1)}%
                                 </span>
                               </div>
                               <Slider
@@ -1049,14 +1062,14 @@ export default function CompositeEditor() {
   useEffect(() => {
     if (location.state?.features) {
       setInitialFeatures(location.state.features)
-      // Convert features to layers
+      // Convert features to layers - maintain proper z-index order
       const newLayers = location.state.features.map((feature: Feature, index: number) => ({
         id: feature.id,
         name: feature.category,
         visible: true,
         opacity: 100,
         feature: feature,
-        zIndex: index
+        zIndex: index // Bottom layer starts at 0
       }))
       setLayers(newLayers)
     }
@@ -1067,13 +1080,17 @@ export default function CompositeEditor() {
   const [selectedFeatureForMovement, setSelectedFeatureForMovement] = useState<string | null>(null);
 
   // Add this function to handle feature selection for movement
-  const handleFeatureSelectionForMovement = (featureLabel: string) => {
-    setSelectedFeatureForMovement(prev => prev === featureLabel ? null : featureLabel);
+  const handleFeatureSelectionForMovement = (featureValue: string) => {
+    console.log('Selected feature for movement:', featureValue);
+    setSelectedFeatureForMovement(prev => prev === featureValue ? null : featureValue);
   };
 
   // Add movement handler
   const handleFeatureMovement = (direction: 'up' | 'down' | 'left' | 'right' | 'upLeft' | 'upRight' | 'downLeft' | 'downRight') => {
     if (!canvasRef.current || !selectedFeatureForMovement) return;
+
+    // Normalize the feature type
+    const featureType = selectedFeatureForMovement === 'faceShape' ? 'faceShape' : selectedFeatureForMovement.toLowerCase();
 
     const moveMap = {
       up: { x: 0, y: -movementStepSize },
@@ -1087,8 +1104,8 @@ export default function CompositeEditor() {
     };
 
     const movement = moveMap[direction];
-    console.log('Moving feature:', selectedFeatureForMovement, 'by:', movement);
-    canvasRef.current.moveFeature(selectedFeatureForMovement, movement.x, movement.y);
+    console.log('Moving feature:', featureType, 'by:', movement);
+    canvasRef.current.moveFeature(featureType, movement.x, movement.y);
   };
 
   // Add new state for rotation
@@ -1098,8 +1115,9 @@ export default function CompositeEditor() {
   const handleFeatureRotation = (direction: 'clockwise' | 'counterclockwise') => {
     if (!canvasRef.current || !selectedFeatureForMovement) return;
 
+    const featureType = selectedFeatureForMovement === 'faceShape' ? 'faceShape' : selectedFeatureForMovement.toLowerCase();
     const angle = direction === 'clockwise' ? rotationAngle : -rotationAngle;
-    canvasRef.current.rotateFeature(selectedFeatureForMovement, angle);
+    canvasRef.current.rotateFeature(featureType, angle);
   };
 
   // Add new state for scale
@@ -1109,12 +1127,38 @@ export default function CompositeEditor() {
   const handleFeatureScale = (direction: 'horizontal' | 'vertical', increase: boolean) => {
     if (!canvasRef.current || !selectedFeatureForMovement) return;
 
-    const scaleFactor = increase ? 1 + scaleStepSize : 1 - scaleStepSize;
+    const featureType = selectedFeatureForMovement === 'faceShape' ? 'faceShape' : selectedFeatureForMovement.toLowerCase();
+    const scaleFactor = increase ? 
+      Math.round((1 + scaleStepSize) * 1000) / 1000 : 
+      Math.round((1 - scaleStepSize) * 1000) / 1000;
     
     if (direction === 'horizontal') {
-      canvasRef.current.scaleFeature(selectedFeatureForMovement, scaleFactor, 1);
+      canvasRef.current.scaleFeature(featureType, scaleFactor, 1);
     } else {
-      canvasRef.current.scaleFeature(selectedFeatureForMovement, 1, scaleFactor);
+      canvasRef.current.scaleFeature(featureType, 1, scaleFactor);
+    }
+  };
+
+  // Add new state for size adjustment (near other transform states)
+  const [sizeStepSize, setSizeStepSize] = useState(5)
+
+  // Add size handler function (near other transform handlers)
+  const handleFeatureSize = (direction: 'increase' | 'decrease', axis: 'both' | 'horizontal' | 'vertical') => {
+    if (!canvasRef.current || !selectedFeatureForMovement) return;
+    
+    const featureType = selectedFeatureForMovement === 'faceShape' ? 'faceShape' : selectedFeatureForMovement.toLowerCase();
+    const scaleFactor = direction === 'increase' ? 1 + (sizeStepSize / 100) : 1 - (sizeStepSize / 100);
+    
+    switch(axis) {
+      case 'both':
+        canvasRef.current.scaleFeature(featureType, scaleFactor, scaleFactor);
+        break;
+      case 'horizontal':
+        canvasRef.current.scaleFeature(featureType, scaleFactor, 1);
+        break;
+      case 'vertical':
+        canvasRef.current.scaleFeature(featureType, 1, scaleFactor);
+        break;
     }
   };
 

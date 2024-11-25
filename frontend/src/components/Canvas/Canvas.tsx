@@ -85,7 +85,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
   useEffect(() => {
     if (!layerRef.current) return
     
-    // Sort layers by zIndex
+    // Sort layers by zIndex (lower zIndex = bottom layer)
     const sortedLayers = [...layers].sort((a, b) => a.zIndex - b.zIndex)
 
     // Handle removed layers
@@ -155,13 +155,14 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
       }
     })
 
-    // Ensure proper layer order
-    sortedLayers.forEach(layer => {
+    // Update layer order - iterate in reverse to ensure proper stacking
+    for (let i = sortedLayers.length - 1; i >= 0; i--) {
+      const layer = sortedLayers[i]
       const image = imagesRef.current.get(layer.id)
-      if (image) {
-        image.moveToTop()
+      if (image && layer.visible) {
+        image.zIndex(i)
       }
-    })
+    }
 
     layerRef.current.batchDraw()
   }, [layers, zoom, width, height])

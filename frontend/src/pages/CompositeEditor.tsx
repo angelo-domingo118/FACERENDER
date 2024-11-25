@@ -18,6 +18,7 @@ import {
   MoveHorizontal, MoveVertical,
   ArrowLeftRight,
   CircleDot, SmilePlus, HeadphonesIcon, Minus, CircleUser,
+  ZoomOut, ZoomIn,
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { Slider } from "@/components/ui/slider"
@@ -37,6 +38,8 @@ import { useLocation } from "react-router-dom"
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { DraggableLayer } from "@/components/DraggableLayer"
+import { toast } from "react-hot-toast"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface TransformSettings {
   face: {
@@ -90,6 +93,38 @@ interface MovementSettings {
   stepSize: number;
 }
 
+// Add these to your existing interfaces
+interface FeatureCategory {
+  label: string
+  value: string
+  icon: JSX.Element
+  hasSubFeatures?: boolean
+  subFeatures?: {
+    label: string
+    value: string
+    icon: JSX.Element
+  }[]
+}
+
+// Add this interface at the top with other interfaces
+interface Feature {
+  id: string;
+  category: string;
+  url: string;
+  isBase?: boolean;
+  needsBlending?: boolean;
+  blendSettings?: {
+    category: string;
+  };
+}
+
+// Add this interface for the preview dialog
+interface PreviewDialogProps {
+  feature: Feature;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
 export default function CompositeEditor() {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [activeTool, setActiveTool] = useState<string | null>(null)
@@ -110,7 +145,7 @@ export default function CompositeEditor() {
     angular: 50,
   })
 
-  const [selectedFeature, setSelectedFeature] = useState<string | null>(null)
+  const [selectedFeature, setSelectedFeature] = useState<string>('faceShape');
   const [transformSettings, setTransformSettings] = useState<TransformSettings>({
     face: {
       shape: { oval: 0, round: 0, triangular: 0, square: 0, angular: 0 },
@@ -129,7 +164,7 @@ export default function CompositeEditor() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [features, setFeatures] = useState<FeatureItem[]>([])
+  const [features, setFeatures] = useState<Feature[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null)
 
@@ -153,13 +188,10 @@ export default function CompositeEditor() {
       setLoading(true);
       console.log('Fetching features for category:', selectedFeature);
       try {
-        const response = await api.get(`/api/features/${selectedFeature.toLowerCase()}`);
+        const response = await api.get(`/api/features/${selectedFeature}`);
         console.log('API Response:', response.data);
         
         if (response.data?.success && Array.isArray(response.data.data)) {
-          if (response.data.data.length === 0) {
-            console.warn(`No features found for category: ${selectedFeature}`);
-          }
           setFeatures(response.data.data);
         } else {
           console.error('Invalid response structure:', response.data);
@@ -241,6 +273,79 @@ export default function CompositeEditor() {
   const renderToolPanel = () => {
     if (!activeTool) return null;
 
+    if (activeTool === "Feature Selection") {
+      return (
+        <div className="w-[320px] border-l flex flex-col bg-background">
+          <div className="p-4 border-b">
+            <div className="space-y-4">
+              {/* Feature Categories */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'faceShape', label: 'Face', icon: <CircleUser className="h-4 w-4" /> },
+                  { value: 'eyes', label: 'Eyes', icon: <Eye className="h-4 w-4" /> },
+                  { value: 'nose', label: 'Nose', icon: <CircleDot className="h-4 w-4" /> },
+                  { value: 'mouth', label: 'Mouth', icon: <SmilePlus className="h-4 w-4" /> },
+                  { value: 'ears', label: 'Ears', icon: <HeadphonesIcon className="h-4 w-4" /> },
+                  { value: 'eyebrows', label: 'Brows', icon: <Minus className="h-4 w-4" /> }
+                ].map((category) => (
+                  <Button
+                    key={category.value}
+                    variant={selectedFeature === category.value ? "secondary" : "ghost"}
+                    className="flex flex-col items-center gap-1 h-auto py-2"
+                    onClick={() => setSelectedFeature(category.value)}
+                  >
+                    {category.icon}
+                    <span className="text-xs">{category.label}</span>
+                  </Button>
+                ))}
+              </div>
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search features..."
+                  className="pl-8"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Feature Grid */}
+          <ScrollArea className="flex-1">
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-2">
+                {loading ? (
+                  Array(4).fill(null).map((_, i) => (
+                    <div
+                      key={i}
+                      className="aspect-square rounded-lg bg-muted animate-pulse"
+                    />
+                  ))
+                ) : features.length > 0 ? (
+                  features.map((feature) => (
+                    <FeaturePreviewCard
+                      key={feature.id}
+                      feature={feature}
+                      isSelected={selectedFeatureId === feature.id}
+                      onSelect={() => handleFeatureSelect(feature)}
+                      gridZoom={gridZoom}
+                    />
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center text-muted-foreground py-4">
+                    No features found
+                  </div>
+                )}
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
+      );
+    }
+
     return (
       <div className="w-[320px] border-l flex flex-col bg-background">
         {activeTool === "Layers" && (
@@ -320,60 +425,159 @@ export default function CompositeEditor() {
           </>
         )}
 
-        {activeTool === "Move" && (
+        {activeTool === "Feature Adjustment" && (
           <>
             <div className="p-4 border-b">
-              <span className="font-medium">Transform Controls</span>
+              <span className="font-medium">Feature Controls</span>
             </div>
-
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-6">
-                {/* Feature Selection - Improved icons */}
-                <div className="space-y-3">
+                {/* Feature Selection - Enhanced Layout */}
+                <div className="space-y-4">
                   <span className="text-sm font-medium">Select Feature</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { 
-                        label: "Eyes", 
-                        value: "eyes",
-                        icon: <Eye className="h-4 w-4" /> 
-                      },
-                      { 
-                        label: "Nose", 
-                        value: "nose",
-                        icon: <CircleDot className="h-4 w-4" />
-                      },
-                      { 
-                        label: "Mouth", 
-                        value: "mouth",
-                        icon: <SmilePlus className="h-4 w-4" />
-                      },
-                      { 
-                        label: "Ears", 
-                        value: "ears",
-                        icon: <HeadphonesIcon className="h-4 w-4" />
-                      },
-                      { 
-                        label: "Eyebrows", 
-                        value: "eyebrows",
-                        icon: <Minus className="h-4 w-4" />
-                      },
-                      { 
-                        label: "Face Shape", 
-                        value: "faceShape",
-                        icon: <CircleUser className="h-4 w-4" />
-                      },
-                    ].map((feature) => (
+                  
+                  {/* Primary Features */}
+                  <div className="space-y-3">
+                    {/* Eyes Section */}
+                    <div className="rounded-lg border bg-card overflow-hidden">
                       <Button
-                        key={feature.label}
-                        variant={selectedFeatureForMovement === feature.value ? "secondary" : "outline"}
-                        className="flex items-center justify-start gap-2 h-9"
-                        onClick={() => handleFeatureSelectionForMovement(feature.value)}
+                        variant={selectedFeatureForMovement === "eyes" ? "secondary" : "ghost"}
+                        className="w-full flex items-center justify-between h-10 px-3 rounded-none border-b"
+                        onClick={() => handleFeatureSelectionForMovement("eyes")}
                       >
-                        {feature.icon}
-                        <span className="text-sm">{feature.label}</span>
+                        <div className="flex items-center gap-2">
+                          <Eye className="h-4 w-4" />
+                          <span className="text-sm font-medium">Eyes</span>
+                        </div>
+                        <Badge variant="outline" className="font-normal">Both</Badge>
                       </Button>
-                    ))}
+                      <div className="p-1 bg-muted/30">
+                        <div className="grid grid-cols-2 gap-1">
+                          <Button
+                            variant={selectedFeatureForMovement === "leftEye" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8 justify-start"
+                            onClick={() => handleFeatureSelectionForMovement("leftEye")}
+                          >
+                            <Eye className="h-3 w-3 mr-2" />
+                            Left Eye
+                          </Button>
+                          <Button
+                            variant={selectedFeatureForMovement === "rightEye" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8 justify-start"
+                            onClick={() => handleFeatureSelectionForMovement("rightEye")}
+                          >
+                            <Eye className="h-3 w-3 mr-2" />
+                            Right Eye
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ears Section */}
+                    <div className="rounded-lg border bg-card overflow-hidden">
+                      <Button
+                        variant={selectedFeatureForMovement === "ears" ? "secondary" : "ghost"}
+                        className="w-full flex items-center justify-between h-10 px-3 rounded-none border-b"
+                        onClick={() => handleFeatureSelectionForMovement("ears")}
+                      >
+                        <div className="flex items-center gap-2">
+                          <HeadphonesIcon className="h-4 w-4" />
+                          <span className="text-sm font-medium">Ears</span>
+                        </div>
+                        <Badge variant="outline" className="font-normal">Both</Badge>
+                      </Button>
+                      <div className="p-1 bg-muted/30">
+                        <div className="grid grid-cols-2 gap-1">
+                          <Button
+                            variant={selectedFeatureForMovement === "leftEar" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8 justify-start"
+                            onClick={() => handleFeatureSelectionForMovement("leftEar")}
+                          >
+                            <HeadphonesIcon className="h-3 w-3 mr-2" />
+                            Left Ear
+                          </Button>
+                          <Button
+                            variant={selectedFeatureForMovement === "rightEar" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8 justify-start"
+                            onClick={() => handleFeatureSelectionForMovement("rightEar")}
+                          >
+                            <HeadphonesIcon className="h-3 w-3 mr-2" />
+                            Right Ear
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Eyebrows Section */}
+                    <div className="rounded-lg border bg-card overflow-hidden">
+                      <Button
+                        variant={selectedFeatureForMovement === "eyebrows" ? "secondary" : "ghost"}
+                        className="w-full flex items-center justify-between h-10 px-3 rounded-none border-b"
+                        onClick={() => handleFeatureSelectionForMovement("eyebrows")}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Minus className="h-4 w-4" />
+                          <span className="text-sm font-medium">Eyebrows</span>
+                        </div>
+                        <Badge variant="outline" className="font-normal">Both</Badge>
+                      </Button>
+                      <div className="p-1 bg-muted/30">
+                        <div className="grid grid-cols-2 gap-1">
+                          <Button
+                            variant={selectedFeatureForMovement === "leftEyebrow" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8 justify-start"
+                            onClick={() => handleFeatureSelectionForMovement("leftEyebrow")}
+                          >
+                            <Minus className="h-3 w-3 mr-2" />
+                            Left Eyebrow
+                          </Button>
+                          <Button
+                            variant={selectedFeatureForMovement === "rightEyebrow" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8 justify-start"
+                            onClick={() => handleFeatureSelectionForMovement("rightEyebrow")}
+                          >
+                            <Minus className="h-3 w-3 mr-2" />
+                            Right Eyebrow
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Nose and Mouth Row */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant={selectedFeatureForMovement === "nose" ? "secondary" : "outline"}
+                        className="h-10 justify-start gap-2"
+                        onClick={() => handleFeatureSelectionForMovement("nose")}
+                      >
+                        <CircleDot className="h-4 w-4" />
+                        <span className="text-sm">Nose</span>
+                      </Button>
+                      <Button
+                        variant={selectedFeatureForMovement === "mouth" ? "secondary" : "outline"}
+                        className="h-10 justify-start gap-2"
+                        onClick={() => handleFeatureSelectionForMovement("mouth")}
+                      >
+                        <SmilePlus className="h-4 w-4" />
+                        <span className="text-sm">Mouth</span>
+                      </Button>
+                    </div>
+
+                    {/* Face Shape - Updated with centered text */}
+                    <Button
+                      variant={selectedFeatureForMovement === "faceShape" ? "secondary" : "outline"}
+                      className="w-full h-10 justify-center gap-2"
+                      onClick={() => handleFeatureSelectionForMovement("faceShape")}
+                    >
+                      <CircleUser className="h-4 w-4" />
+                      <span className="text-sm">Face Shape</span>
+                    </Button>
                   </div>
                 </div>
 
@@ -635,7 +839,7 @@ export default function CompositeEditor() {
         {activeTool === "Transform" && (
           <>
             <div className="p-4 border-b">
-              <span className="font-medium">Transform Controls</span>
+              <span className="font-medium">Feature Controls</span>
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-4">
@@ -841,143 +1045,93 @@ export default function CompositeEditor() {
           </>
         )}
 
-        {activeTool === "Features" && (
+        {activeTool === "Feature Selection" && (
           <>
             <div className="p-4 border-b">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">Feature Library</span>
-                {selectedFeature && (
+              <div className="space-y-4">
+                {/* Feature Categories */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'faceShape', label: 'Face', icon: <CircleUser className="h-4 w-4" /> },
+                    { value: 'eyes', label: 'Eyes', icon: <Eye className="h-4 w-4" /> },
+                    { value: 'nose', label: 'Nose', icon: <CircleDot className="h-4 w-4" /> },
+                    { value: 'mouth', label: 'Mouth', icon: <SmilePlus className="h-4 w-4" /> },
+                    { value: 'ears', label: 'Ears', icon: <HeadphonesIcon className="h-4 w-4" /> },
+                    { value: 'eyebrows', label: 'Brows', icon: <Minus className="h-4 w-4" /> }
+                  ].map((category) => (
+                    <Button
+                      key={category.value}
+                      variant={selectedFeature === category.value ? "secondary" : "ghost"}
+                      className="flex flex-col items-center gap-1 h-auto py-2"
+                      onClick={() => handleCategorySelect(category.value)}
+                    >
+                      {category.icon}
+                      <span className="text-xs">{category.label}</span>
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Search and Filters */}
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search features..."
+                      className="pl-8"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Grid Zoom Controls */}
+                <div className="flex items-center gap-2">
                   <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => setSelectedFeature(null)}
+                    variant="outline" 
+                    size="icon" 
+                    className="h-8 w-8"
+                    onClick={() => setGridZoom(Math.max(100, gridZoom - 20))}
                   >
-                    <X className="h-4 w-4" />
+                    <ZoomOut className="h-4 w-4" />
                   </Button>
-                )}
+                  <span className="text-sm text-muted-foreground w-12 text-center">
+                    {gridZoom}%
+                  </span>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="h-8 w-8"
+                    onClick={() => setGridZoom(Math.min(200, gridZoom + 20))}
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
 
-            <ScrollArea className="flex-1">
-              <div className="p-4 space-y-6">
-                {!selectedFeature ? (
-                  // Feature Categories
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { 
-                        label: "Eyes",
-                        icon: <Eye className="h-5 w-5" />
-                      },
-                      { 
-                        label: "Nose",
-                        icon: <StretchHorizontal className="h-5 w-5" />
-                      },
-                      { 
-                        label: "Mouth",
-                        icon: <StretchHorizontal className="h-5 w-5 rotate-180" />
-                      },
-                      { 
-                        label: "Ears",
-                        icon: <StretchVertical className="h-5 w-5" />
-                      },
-                      { 
-                        label: "Eyebrows",
-                        icon: <StretchHorizontal className="h-5 w-5" />
-                      },
-                      { 
-                        label: "Face Shape",
-                        icon: <Maximize2 className="h-5 w-5" />
-                      },
-                      { 
-                        label: "Hair",
-                        value: "hair",
-                        icon: <StretchVertical className="h-5 w-5 rotate-45" />
-                      }
-                    ].map((feature) => (
-                      <Button
-                        key={feature.label}
-                        variant="outline"
-                        className="h-20 flex flex-col items-center justify-center gap-2 hover:border-primary group relative"
-                        onClick={() => setSelectedFeature(feature.label)}
-                      >
-                        <div className="h-10 w-10 rounded-lg bg-background border flex items-center justify-center group-hover:border-primary transition-colors">
-                          {feature.icon}
-                        </div>
-                        <div className="text-sm font-medium">{feature.label}</div>
-                      </Button>
-                    ))}
-                  </div>
+            {/* Feature Grid */}
+            <ScrollArea className="flex-1 p-4">
+              <div className="grid grid-cols-2 gap-2">
+                {loading ? (
+                  Array(4).fill(null).map((_, i) => (
+                    <div
+                      key={i}
+                      className="aspect-square rounded-lg bg-muted animate-pulse"
+                    />
+                  ))
+                ) : features.length > 0 ? (
+                  features.map((feature) => (
+                    <FeaturePreviewCard
+                      key={feature.id}
+                      feature={feature}
+                      isSelected={selectedFeatureId === feature.id}
+                      onSelect={() => handleFeatureSelect(feature)}
+                      gridZoom={gridZoom}
+                    />
+                  ))
                 ) : (
-                  // Feature Database View
-                  <div className="space-y-4">
-                    {/* Back Button */}
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setSelectedFeature(null)}
-                      className="h-8 px-2"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back
-                    </Button>
-
-                    {/* Search */}
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder={`Search ${selectedFeature}...`}
-                        className="pl-8" 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-
-                    {/* Features Grid */}
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      {loading ? (
-                        // Loading placeholders
-                        Array(6).fill(null).map((_, i) => (
-                          <div
-                            key={i}
-                            className="aspect-square rounded-lg bg-muted/50 animate-pulse"
-                          />
-                        ))
-                      ) : features.length > 0 ? (
-                        features
-                          .filter(feature => 
-                            searchQuery === "" || 
-                            feature.name.toLowerCase().includes(searchQuery.toLowerCase())
-                          )
-                          .map((feature) => (
-                            <div
-                              key={feature.id}
-                              className={cn(
-                                "relative rounded-lg bg-muted/50 border-2 transition-all cursor-pointer",
-                                "hover:border-primary/50 hover:bg-muted/70",
-                                selectedFeatureId === feature.id ? "border-primary" : "border-transparent"
-                              )}
-                              style={{ aspectRatio: '1' }}
-                              onClick={() => handleFeatureClick(feature)}
-                            >
-                              <img 
-                                src={feature.url}
-                                alt={`${feature.category} type ${feature.type}`}
-                                className="w-full h-full object-contain p-2"
-                                draggable={false}
-                              />
-                              {selectedFeatureId === feature.id && (
-                                <div className="absolute top-2 right-2">
-                                  <Check className="h-4 w-4 text-primary" />
-                                </div>
-                              )}
-                            </div>
-                          ))
-                      ) : (
-                        <div className="col-span-2 text-center text-muted-foreground py-8">
-                          No features found {searchQuery && "for your search"}
-                        </div>
-                      )}
-                    </div>
+                  <div className="col-span-2 text-center text-muted-foreground py-4">
+                    No features found
                   </div>
                 )}
               </div>
@@ -1162,6 +1316,402 @@ export default function CompositeEditor() {
     }
   };
 
+  const FeatureSelectionContent = () => {
+    const featureCategories = [
+      { value: 'faceShape', label: 'Face Shape', icon: <CircleUser className="h-4 w-4" /> },
+      { value: 'eyes', label: 'Eyes', icon: <Eye className="h-4 w-4" /> },
+      { value: 'eyebrows', label: 'Eyebrows', icon: <Minus className="h-4 w-4" /> },
+      { value: 'nose', label: 'Nose', icon: <CircleDot className="h-4 w-4" /> },
+      { value: 'mouth', label: 'Mouth', icon: <SmilePlus className="h-4 w-4" /> },
+      { value: 'ears', label: 'Ears', icon: <HeadphonesIcon className="h-4 w-4" /> }
+    ];
+
+    return (
+      <div className="p-4 space-y-4">
+        {featureCategories.map((category) => (
+          <div key={category.value}>
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start",
+                selectedFeature === category.value && "bg-accent text-accent-foreground"
+              )}
+              onClick={() => handleCategorySelect(category.value)}
+            >
+              {category.icon}
+              <span className="ml-2">{category.label}</span>
+            </Button>
+            
+            {selectedFeature === category.value && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {loading ? (
+                  Array(4).fill(null).map((_, i) => (
+                    <div
+                      key={i}
+                      className="aspect-square rounded-lg bg-muted/50 animate-pulse"
+                    />
+                  ))
+                ) : features.length > 0 ? (
+                  features.map((feature) => (
+                    <FeaturePreviewCard
+                      key={feature.id}
+                      feature={feature}
+                      isSelected={selectedFeatureId === feature.id}
+                      onSelect={() => handleFeatureSelect(feature)}
+                      gridZoom={gridZoom}
+                    />
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center text-muted-foreground py-4">
+                    No features found
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Update the FeaturePreviewDialog component
+  const FeaturePreviewDialog = ({ feature, open, onOpenChange }: PreviewDialogProps) => {
+    const [previewZoom, setPreviewZoom] = useState(150);
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+
+    // Reset position when dialog opens
+    useEffect(() => {
+      if (open) {
+        setPosition({ x: 0, y: 0 });
+      }
+    }, [open]);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+      setIsDragging(true);
+      setStartPos({
+        x: e.clientX - position.x,
+        y: e.clientY - position.y
+      });
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+      if (!isDragging) return;
+      
+      setPosition({
+        x: e.clientX - startPos.x,
+        y: e.clientY - startPos.y
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-[80vw] w-[800px] max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Feature Preview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setPreviewZoom(Math.max(50, previewZoom - 25))}
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center bg-muted rounded-md px-2 flex-1">
+                <Input 
+                  type="number" 
+                  value={previewZoom}
+                  onChange={(e) => setPreviewZoom(Math.min(400, Math.max(50, Number(e.target.value))))}
+                  className="h-8 text-center border-0 bg-transparent"
+                  min={50}
+                  max={400}
+                  step={25}
+                />
+                <span className="text-sm text-muted-foreground ml-1">%</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setPreviewZoom(Math.min(400, previewZoom + 25))}
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Preview Container */}
+            <div 
+              className="relative rounded-lg border overflow-hidden cursor-move bg-muted/30" 
+              style={{ 
+                height: 'calc(70vh - 100px)',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              {/* Image Container */}
+              <div
+                className="absolute transition-transform duration-75"
+                style={{
+                  transform: `translate(${position.x}px, ${position.y}px)`,
+                  cursor: isDragging ? 'grabbing' : 'grab',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                  height: '100%'
+                }}
+              >
+                <img 
+                  src={feature.url}
+                  alt={feature.category}
+                  className="transition-transform duration-200"
+                  style={{
+                    transform: `scale(${previewZoom / 100})`,
+                    transformOrigin: 'center center',
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    objectFit: 'contain',
+                    userSelect: 'none',
+                    pointerEvents: 'none'
+                  }}
+                  draggable={false}
+                />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Update the FeaturePreviewCard component
+  const FeaturePreviewCard = ({ 
+    feature, 
+    isSelected, 
+    onSelect,
+    gridZoom 
+  }: { 
+    feature: Feature
+    isSelected: boolean
+    onSelect: () => void
+    gridZoom: number
+  }) => {
+    const [showPreview, setShowPreview] = useState(false);
+    const [image, setImage] = useState<HTMLImageElement | null>(null);
+
+    useEffect(() => {
+      const img = new Image();
+      img.src = feature.url;
+      img.onload = () => setImage(img);
+    }, [feature.url]);
+
+    if (!image) {
+      return (
+        <div className="aspect-square rounded-lg bg-muted/50 animate-pulse" />
+      );
+    }
+
+    const getZoomLevel = () => {
+      // Reduced zoom levels for better visibility
+      switch (feature.category) {
+        case 'faceShape':
+          return 1.1; // Slightly zoomed for face shape
+        case 'eyes':
+          return 1.8; // Reduced from 2.5
+        case 'nose':
+          return 1.6; // Reduced from 2.2
+        case 'mouth':
+          return 1.6; // Reduced from 2.2
+        case 'ears':
+          return 1.5; // Reduced from 2.0
+        case 'eyebrows':
+          return 1.7; // Reduced from 2.3
+        default:
+          return 1.2;
+      }
+    };
+
+    return (
+      <>
+        <div
+          className={cn(
+            "group relative aspect-square rounded-lg bg-muted/50 border-2 transition-all cursor-pointer overflow-hidden",
+            "hover:border-primary/50 hover:bg-muted/70",
+            isSelected ? "border-primary" : "border-transparent"
+          )}
+          onClick={onSelect}
+        >
+          {/* Preview Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowPreview(true);
+            }}
+          >
+            <Maximize2 className="h-3 w-3" />
+          </Button>
+
+          {/* Feature Image */}
+          <div className="w-full h-full relative overflow-hidden">
+            <img 
+              src={feature.url}
+              alt={feature.category}
+              className="absolute w-full h-full transition-transform duration-200"
+              style={{
+                objectFit: feature.category === 'faceShape' ? 'contain' : 'cover',
+                objectPosition: 'center',
+                transform: `scale(${getZoomLevel()})`,
+                transformOrigin: 'center center'
+              }}
+            />
+          </div>
+
+          {isSelected && (
+            <div className="absolute top-1 left-1 z-10">
+              <div className="bg-primary text-primary-foreground rounded-full p-1">
+                <Check className="h-3 w-3" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <FeaturePreviewDialog
+          feature={feature}
+          open={showPreview}
+          onOpenChange={setShowPreview}
+        />
+      </>
+    );
+  };
+
+  // Add these state variables at the top of the CompositeEditor component
+  const [gridZoom, setGridZoom] = useState(150);
+  const [currentFeature, setCurrentFeature] = useState<string>('faceShape');
+
+  // Add this function to handle feature selection
+  const handleFeatureSelect = async (feature: FeatureItem) => {
+    try {
+      setSelectedFeatureId(feature.id);
+
+      // Update layers while preserving modifications
+      setLayers(prev => {
+        return prev.map(layer => {
+          if (layer.feature.category === selectedFeature) {
+            // Preserve existing modifications for this category
+            const existingMods = featureModifications[selectedFeature] || {};
+            
+            return {
+              ...layer,
+              id: feature.id,
+              feature: {
+                ...feature,
+                needsBlending: selectedFeature !== 'faceShape',
+                blendSettings: selectedFeature !== 'faceShape' ? {
+                  category: selectedFeature,
+                  ...existingMods // Apply existing modifications
+                } : undefined
+              }
+            };
+          }
+          return layer;
+        });
+      });
+
+      // Update canvas with new feature while preserving modifications
+      if (canvasRef.current) {
+        const imageNode = imagesRef.current.get(selectedFeature);
+        if (imageNode) {
+          const img = new Image();
+          img.src = feature.url;
+          img.onload = () => {
+            imageNode.image(img);
+            
+            // Reapply modifications after loading new image
+            const mods = featureModifications[selectedFeature];
+            if (mods) {
+              Object.entries(mods).forEach(([key, value]) => {
+                imageNode[key](value);
+              });
+            }
+            
+            layerRef.current?.batchDraw();
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error updating feature:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update feature",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Add this function to handle category selection
+  const handleCategorySelect = async (category: string) => {
+    setSelectedFeature(category);
+    setLoading(true);
+    
+    try {
+      // This matches CompositeBuilder's API call pattern
+      const response = await api.get(`/api/features/${category}`);
+      if (response.data?.features) {
+        setFeatures(response.data.features);
+      }
+    } catch (error) {
+      console.error('Failed to fetch features:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load features",
+        variant: "destructive"
+      });
+      setFeatures([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add after other state declarations
+  const [featureModifications, setFeatureModifications] = useState<Record<string, any>>({});
+
+  const handleFeatureModification = (category: string, modification: Record<string, any>) => {
+    setFeatureModifications(prev => ({
+      ...prev,
+      [category]: {
+        ...(prev[category] || {}),
+        ...modification
+      }
+    }));
+
+    // Apply modification to canvas
+    if (canvasRef.current) {
+      const imageNode = imagesRef.current.get(category);
+      if (imageNode) {
+        Object.entries(modification).forEach(([key, value]) => {
+          imageNode[key](value);
+        });
+        layerRef.current?.batchDraw();
+      }
+    }
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen bg-background">
@@ -1188,7 +1738,7 @@ export default function CompositeEditor() {
                   size="icon"
                   className={cn(
                     "rounded-lg transition-colors hover:bg-accent",
-                    isCollapsed ? "h-8 w-8" : "h-8 w-8"
+                    isCollapsed ? "h-8 w-8" : "h-10 w-10"
                   )}
                   onClick={() => setIsCollapsed(!isCollapsed)}
                 >
@@ -1306,10 +1856,10 @@ export default function CompositeEditor() {
               )}>
                 {[
                   { icon: <Layers className="h-5 w-5" />, label: "Layers" },
+                  { icon: <Move className="h-5 w-5" />, label: "Feature Adjustment" },
+                  { icon: <ImageIcon className="h-5 w-5" />, label: "Feature Selection" },
                   { icon: <Sliders className="h-5 w-5" />, label: "Attributes" },
-                  { icon: <Move className="h-5 w-5" />, label: "Move" },
-                  { icon: <ArrowDownUp className="h-5 w-5" />, label: "Transform" },
-                  { icon: <ImageIcon className="h-5 w-5" />, label: "Features" }
+                  { icon: <ArrowDownUp className="h-5 w-5" />, label: "Transform" }
                 ].map((tool) => (
                   <Button 
                     key={tool.label}

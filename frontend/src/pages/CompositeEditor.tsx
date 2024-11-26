@@ -464,116 +464,45 @@ export default function CompositeEditor() {
                   <span className="text-sm font-medium">Select Feature</span>
                   
                   {/* Primary Features */}
-                  <div className="space-y-3">
-                    {/* Eyes Section */}
-                    <div className="rounded-lg border bg-card overflow-hidden">
+                  <div className="space-y-2">
+                    {/* Eyes and Ears Row */}
+                    <div className="grid grid-cols-2 gap-2">
                       <Button
-                        variant={selectedFeatureForMovement === "eyes" ? "secondary" : "ghost"}
-                        className="w-full flex items-center justify-between h-10 px-3 rounded-none border-b"
+                        variant={selectedFeatureForMovement === "eyes" ? "secondary" : "outline"}
+                        className="h-10 justify-start gap-2"
                         onClick={() => handleFeatureSelectionForMovement("eyes")}
                       >
-                        <div className="flex items-center gap-2">
-                          <Eye className="h-4 w-4" />
-                          <span className="text-sm font-medium">Eyes</span>
-                        </div>
-                        <Badge variant="outline" className="font-normal">Both</Badge>
+                        <Eye className="h-4 w-4" />
+                        <span className="text-sm">Eyes</span>
                       </Button>
-                      <div className="p-1 bg-muted/30">
-                        <div className="grid grid-cols-2 gap-1">
-                          <Button
-                            variant={selectedFeatureForMovement === "leftEye" ? "secondary" : "ghost"}
-                            size="sm"
-                            className="h-8 justify-start"
-                            onClick={() => handleFeatureSelectionForMovement("leftEye")}
-                          >
-                            <Eye className="h-3 w-3 mr-2" />
-                            Left Eye
-                          </Button>
-                          <Button
-                            variant={selectedFeatureForMovement === "rightEye" ? "secondary" : "ghost"}
-                            size="sm"
-                            className="h-8 justify-start"
-                            onClick={() => handleFeatureSelectionForMovement("rightEye")}
-                          >
-                            <Eye className="h-3 w-3 mr-2" />
-                            Right Eye
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ears Section */}
-                    <div className="rounded-lg border bg-card overflow-hidden">
                       <Button
-                        variant={selectedFeatureForMovement === "ears" ? "secondary" : "ghost"}
-                        className="w-full flex items-center justify-between h-10 px-3 rounded-none border-b"
+                        variant={selectedFeatureForMovement === "ears" ? "secondary" : "outline"}
+                        className="h-10 justify-start gap-2"
                         onClick={() => handleFeatureSelectionForMovement("ears")}
                       >
-                        <div className="flex items-center gap-2">
-                          <HeadphonesIcon className="h-4 w-4" />
-                          <span className="text-sm font-medium">Ears</span>
-                        </div>
-                        <Badge variant="outline" className="font-normal">Both</Badge>
+                        <HeadphonesIcon className="h-4 w-4" />
+                        <span className="text-sm">Ears</span>
                       </Button>
-                      <div className="p-1 bg-muted/30">
-                        <div className="grid grid-cols-2 gap-1">
-                          <Button
-                            variant={selectedFeatureForMovement === "leftEar" ? "secondary" : "ghost"}
-                            size="sm"
-                            className="h-8 justify-start"
-                            onClick={() => handleFeatureSelectionForMovement("leftEar")}
-                          >
-                            <HeadphonesIcon className="h-3 w-3 mr-2" />
-                            Left Ear
-                          </Button>
-                          <Button
-                            variant={selectedFeatureForMovement === "rightEar" ? "secondary" : "ghost"}
-                            size="sm"
-                            className="h-8 justify-start"
-                            onClick={() => handleFeatureSelectionForMovement("rightEar")}
-                          >
-                            <HeadphonesIcon className="h-3 w-3 mr-2" />
-                            Right Ear
-                          </Button>
-                        </div>
-                      </div>
                     </div>
 
-                    {/* Eyebrows Section */}
-                    <div className="rounded-lg border bg-card overflow-hidden">
+                    {/* Eyebrows and Face Shape Row */}
+                    <div className="grid grid-cols-2 gap-2">
                       <Button
-                        variant={selectedFeatureForMovement === "eyebrows" ? "secondary" : "ghost"}
-                        className="w-full flex items-center justify-between h-10 px-3 rounded-none border-b"
+                        variant={selectedFeatureForMovement === "eyebrows" ? "secondary" : "outline"}
+                        className="h-10 justify-start gap-2"
                         onClick={() => handleFeatureSelectionForMovement("eyebrows")}
                       >
-                        <div className="flex items-center gap-2">
-                          <Minus className="h-4 w-4" />
-                          <span className="text-sm font-medium">Eyebrows</span>
-                        </div>
-                        <Badge variant="outline" className="font-normal">Both</Badge>
+                        <Minus className="h-4 w-4" />
+                        <span className="text-sm">Brows</span>
                       </Button>
-                      <div className="p-1 bg-muted/30">
-                        <div className="grid grid-cols-2 gap-1">
-                          <Button
-                            variant={selectedFeatureForMovement === "leftEyebrow" ? "secondary" : "ghost"}
-                            size="sm"
-                            className="h-8 justify-start"
-                            onClick={() => handleFeatureSelectionForMovement("leftEyebrow")}
-                          >
-                            <Minus className="h-3 w-3 mr-2" />
-                            Left Eyebrow
-                          </Button>
-                          <Button
-                            variant={selectedFeatureForMovement === "rightEyebrow" ? "secondary" : "ghost"}
-                            size="sm"
-                            className="h-8 justify-start"
-                            onClick={() => handleFeatureSelectionForMovement("rightEyebrow")}
-                          >
-                            <Minus className="h-3 w-3 mr-2" />
-                            Right Eyebrow
-                          </Button>
-                        </div>
-                      </div>
+                      <Button
+                        variant={selectedFeatureForMovement === "faceShape" ? "secondary" : "outline"}
+                        className="h-10 justify-start gap-2"
+                        onClick={() => handleFeatureSelectionForMovement("faceShape")}
+                      >
+                        <CircleUser className="h-4 w-4" />
+                        <span className="text-sm">Face</span>
+                      </Button>
                     </div>
 
                     {/* Nose and Mouth Row */}
@@ -595,16 +524,6 @@ export default function CompositeEditor() {
                         <span className="text-sm">Mouth</span>
                       </Button>
                     </div>
-
-                    {/* Face Shape - Updated with centered text */}
-                    <Button
-                      variant={selectedFeatureForMovement === "faceShape" ? "secondary" : "outline"}
-                      className="w-full h-10 justify-center gap-2"
-                      onClick={() => handleFeatureSelectionForMovement("faceShape")}
-                    >
-                      <CircleUser className="h-4 w-4" />
-                      <span className="text-sm">Face Shape</span>
-                    </Button>
                   </div>
                 </div>
 

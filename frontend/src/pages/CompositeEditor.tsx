@@ -72,6 +72,7 @@ interface CanvasRef {
   moveFeature: (featureType: string, deltaX: number, deltaY: number) => void
   rotateFeature: (featureType: string, angle: number) => void
   scaleFeature: (featureType: string, scaleX: number, scaleY: number) => void
+  flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => void
 }
 
 interface CompositeState {
@@ -775,6 +776,31 @@ export default function CompositeEditor() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* Flip Controls */}
+                <div className="space-y-3">
+                  <span className="text-sm font-medium">Flip</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex items-center justify-center gap-2"
+                      onClick={() => handleFeatureFlip('horizontal')}
+                      disabled={!selectedFeatureForMovement}
+                    >
+                      <ChevronsLeftRight className="h-4 w-4" />
+                      <span className="text-sm">Horizontal</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex items-center justify-center gap-2"
+                      onClick={() => handleFeatureFlip('vertical')}
+                      disabled={!selectedFeatureForMovement}
+                    >
+                      <ChevronsUpDown className="h-4 w-4" />
+                      <span className="text-sm">Vertical</span>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1656,6 +1682,14 @@ export default function CompositeEditor() {
         layerRef.current?.batchDraw();
       }
     }
+  };
+
+  // Add flip handler function (near other transform handlers)
+  const handleFeatureFlip = (direction: 'horizontal' | 'vertical') => {
+    if (!canvasRef.current || !selectedFeatureForMovement) return;
+    
+    const featureType = selectedFeatureForMovement === 'faceShape' ? 'faceShape' : selectedFeatureForMovement.toLowerCase();
+    canvasRef.current.flipFeature(featureType, direction);
   };
 
   return (

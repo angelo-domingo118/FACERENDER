@@ -21,6 +21,7 @@ interface CanvasRef {
   moveFeature: (featureType: string, deltaX: number, deltaY: number) => void
   rotateFeature: (featureType: string, angle: number) => void
   scaleFeature: (featureType: string, scaleX: number, scaleY: number) => void
+  flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => void
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
@@ -76,6 +77,27 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
           x: currentScaleX * scaleX,
           y: currentScaleY * scaleY
         });
+        
+        layerRef.current?.batchDraw();
+      }
+    },
+    flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => {
+      const targetLayer = Array.from(imagesRef.current.entries()).find(
+        ([_, image]) => image.id().toLowerCase().includes(featureType.toLowerCase())
+      );
+
+      if (targetLayer) {
+        const [_, image] = targetLayer;
+        // Get current scale
+        const currentScaleX = image.scaleX();
+        const currentScaleY = image.scaleY();
+        
+        // Apply flip by negating the scale
+        if (direction === 'horizontal') {
+          image.scaleX(-currentScaleX);
+        } else {
+          image.scaleY(-currentScaleY);
+        }
         
         layerRef.current?.batchDraw();
       }

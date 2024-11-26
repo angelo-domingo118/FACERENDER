@@ -14,6 +14,7 @@ interface CanvasProps {
   initialZoom: number
   initialFeatures: Feature[]
   disableDragging?: boolean
+  stageRef?: React.RefObject<Konva.Stage>
 }
 
 interface CanvasRef {
@@ -22,13 +23,83 @@ interface CanvasRef {
   rotateFeature: (featureType: string, angle: number) => void
   scaleFeature: (featureType: string, scaleX: number, scaleY: number) => void
   flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => void
+  adjustSkinTone: (value: number, skinAnalysis?: SkinAnalysisResult) => void
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
-  const { width, height, layers, zoom } = props
-  const stageRef = useRef<Konva.Stage>(null)
+  const { width, height, layers, zoom, stageRef: externalStageRef } = props
+  const internalStageRef = useRef<Konva.Stage>(null)
+  const stageRef = externalStageRef || internalStageRef
   const layerRef = useRef<Konva.Layer>(null)
   const imagesRef = useRef<Map<string, Konva.Image>>(new Map())
+
+  const applySkinToneFilter = async (value: number, skinAnalysis?: SkinAnalysisResult) => {
+    console.log('applySkinToneFilter called:', { value, skinAnalysis });
+    const normalizedValue = value / 100;
+    console.log('Normalized value:', normalizedValue);
+    
+    console.log('Current images in ref:', Array.from(imagesRef.current.keys()));
+    
+    imagesRef.current.forEach((image, id) => {
+      console.log('Processing image:', { id });
+      
+      // Extract the category from the image ID
+      const category = id.split('_')[0];
+      
+      // Expanded list of features that contain skin
+      const hasSkin = [
+        'face',
+        'nose', 
+        'mouth',
+        'eyes',
+        'eyebrows',
+        'ears'
+      ].includes(category);
+
+      console.log('Image skin detection:', { id, category, hasSkin });
+      
+      if (hasSkin) {
+        console.log('Applying filters to image:', id);
+        image.filters([Konva.Filters.HSL]);
+        
+        // Use dominant color analysis for more accurate adjustments
+        if (skinAnalysis?.dominantColor) {
+          const { h, s, l } = skinAnalysis.dominantColor;
+          console.log('Applying HSL adjustments:', { id, h, s, l, normalizedValue });
+          
+          // Adjust filter strength based on feature type
+          const strengthMultiplier = category === 'face' || category === 'nose' ? 1.0 :
+                                   category === 'mouth' ? 0.8 :
+                                   category === 'eyes' || category === 'eyebrows' ? 0.6 :
+                                   0.7; // default for other features
+          
+          // Apply adjusted HSL values
+          image.saturation(Math.max(0, Math.min(1, s/100 + (normalizedValue * 0.3 * strengthMultiplier))));
+          
+          const lightnessAdjustment = normalizedValue * 0.2 * strengthMultiplier;
+          image.brightness(Math.max(0, Math.min(1, l/100 + lightnessAdjustment)));
+          
+          // Add slight warmth adjustment for more natural look
+          const warmth = normalizedValue > 0 ? normalizedValue * 0.1 * strengthMultiplier : 0;
+          image.hue(warmth);
+        } else {
+          // Fallback adjustments with feature-specific strength
+          const strengthMultiplier = category === 'face' || category === 'nose' ? 1.0 :
+                                   category === 'mouth' ? 0.8 :
+                                   category === 'eyes' || category === 'eyebrows' ? 0.6 :
+                                   0.7;
+                                   
+          image.saturation(0.5 + (normalizedValue * 0.2 * strengthMultiplier));
+          image.brightness(0.5 + (normalizedValue * 0.15 * strengthMultiplier));
+        }
+        
+        image.cache();
+      }
+    });
+    
+    console.log('Calling batchDraw...');
+    layerRef.current?.batchDraw();
+  };
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -101,6 +172,10 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
         
         layerRef.current?.batchDraw();
       }
+    },
+    adjustSkinTone: (value: number, skinAnalysis?: SkinAnalysisResult) => {
+      console.log('adjustSkinTone ref method called:', { value });
+      applySkinToneFilter(value, skinAnalysis);
     }
   }))
 
@@ -148,6 +223,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
       } else {
         // Create new image only if it doesn't exist
         const image = new window.Image()
+        image.crossOrigin = 'anonymous'
         image.src = layer.feature.url
         image.onload = () => {
           const scaleX = width / image.width
@@ -195,6 +271,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
       width={width}
       height={height}
       draggable={false}
+      imageSmoothingEnabled={true}
+      crossOrigin="anonymous"
     >
       <Layer ref={layerRef} listening={false} />
     </Stage>

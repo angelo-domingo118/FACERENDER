@@ -40,6 +40,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend'
 import { DraggableLayer } from "@/components/DraggableLayer"
 import { toast } from "react-hot-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { analyzeFacialSkin } from '@/lib/skinAnalysis';
 
 interface TransformSettings {
   face: {
@@ -135,9 +136,8 @@ export default function CompositeEditor() {
 
   // Update attributes state
   const [attributes, setAttributes] = useState({
-    skinTone: 50,
+    skinTone: 0,
     contrast: 50,
-    age: 50,
     symmetry: 50,      // Controls facial symmetry
     sharpness: 50,     // Controls feature definition/clarity
     blur: 50,         // Controls feature softness/blur
@@ -168,6 +168,7 @@ export default function CompositeEditor() {
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null)
 
   const canvasRef = useRef<CanvasRef>(null)
+  const stageRef = useRef<Konva.Stage>(null)
 
   const location = useLocation()
   const [initialFeatures, setInitialFeatures] = useState<Feature[]>([])
@@ -291,7 +292,7 @@ export default function CompositeEditor() {
                     key={category.value}
                     variant={selectedFeature === category.value ? "secondary" : "ghost"}
                     className="flex flex-col items-center gap-1 h-auto py-2"
-                    onClick={() => setSelectedFeature(category.value)}
+                    onClick={() => handleCategorySelect(category.value)}
                   >
                     {category.icon}
                     <span className="text-xs">{category.label}</span>
@@ -398,11 +399,6 @@ export default function CompositeEditor() {
                     description: 'Enhance feature definition' 
                   },
                   { 
-                    key: 'age', 
-                    label: 'Age',
-                    description: 'Adjust age-related characteristics' 
-                  },
-                  { 
                     key: 'symmetry', 
                     label: 'Symmetry',
                     description: 'Balance facial features' 
@@ -439,10 +435,14 @@ export default function CompositeEditor() {
                       max={100}
                       step={1}
                       onValueChange={([value]) => {
+                        console.log('Slider value changed:', { key: attr.key, value });
+                        if (attr.key === 'skinTone') {
+                          handleSkinToneChange(value);
+                        }
                         setAttributes(prev => ({
                           ...prev,
                           [attr.key]: value
-                        }))
+                        }));
                       }}
                       className="w-full"
                     />
@@ -1585,8 +1585,10 @@ export default function CompositeEditor() {
       setLayers(prev => {
         return prev.map(layer => {
           if (layer.feature.category === selectedFeature) {
-            // Preserve existing modifications for this category
-            const existingMods = featureModifications[selectedFeature] || {};
+            // Ensure image is loaded with CORS
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.src = feature.url;
             
             return {
               ...layer,
@@ -1596,7 +1598,7 @@ export default function CompositeEditor() {
                 needsBlending: selectedFeature !== 'faceShape',
                 blendSettings: selectedFeature !== 'faceShape' ? {
                   category: selectedFeature,
-                  ...existingMods // Apply existing modifications
+                  ...existingMods
                 } : undefined
               }
             };
@@ -1627,12 +1629,7 @@ export default function CompositeEditor() {
         }
       }
     } catch (error) {
-      console.error('Error updating feature:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update feature",
-        variant: "destructive"
-      });
+      console.error('Error selecting feature:', error);
     }
   };
 
@@ -1690,6 +1687,61 @@ export default function CompositeEditor() {
     
     const featureType = selectedFeatureForMovement === 'faceShape' ? 'faceShape' : selectedFeatureForMovement.toLowerCase();
     canvasRef.current.flipFeature(featureType, direction);
+  };
+
+  const handleSkinToneChange = async (value: number) => {
+    console.log('handleSkinToneChange called:', { value });
+    
+    setAttributes(prev => ({
+      ...prev,
+      skinTone: value
+    }));
+
+    try {
+      if (!canvasRef.current) {
+        console.log('Canvas ref is null');
+        return;
+      }
+
+      // Get canvas element
+      const stage = stageRef.current;
+      if (!stage) {
+        console.log('Stage ref is null');
+        return;
+      }
+
+      // Create a new canvas from the stage's data URL
+      const dataURL = stage.toDataURL();
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d')!;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = dataURL;
+      });
+
+      tempCanvas.width = stage.width();
+      tempCanvas.height = stage.height();
+      tempCtx.drawImage(img, 0, 0);
+
+      console.log('Getting skin analysis...');
+      const skinAnalysis = await analyzeFacialSkin(tempCanvas, layers);
+      console.log('Skin analysis result:', skinAnalysis);
+      
+      console.log('Applying skin tone adjustment...');
+      canvasRef.current.adjustSkinTone(value, skinAnalysis);
+
+    } catch (error) {
+      console.error('Error in handleSkinToneChange:', error);
+      toast({
+        title: "Error adjusting skin tone",
+        description: error instanceof Error ? error.message : "Failed to apply skin tone adjustment",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -1912,6 +1964,7 @@ export default function CompositeEditor() {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <Canvas 
                       ref={canvasRef}
+                      stageRef={stageRef}
                       width={512}
                       height={512}
                       layers={layers}

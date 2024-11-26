@@ -132,17 +132,15 @@ export default function CompositeEditor() {
   // Dummy layers data
   const [layers, setLayers] = useState<Layer[]>([])
 
-  // Add attributes state
+  // Update attributes state
   const [attributes, setAttributes] = useState({
     skinTone: 50,
     contrast: 50,
-    wrinkles: 0,
-    hostility: 0,
-    friendliness: 50,
-    happiness: 50,
-    weight: 50,
-    hardness: 50,
-    angular: 50,
+    age: 50,
+    symmetry: 50,      // Controls facial symmetry
+    sharpness: 50,     // Controls feature definition/clarity
+    blur: 50,         // Controls feature softness/blur
+    lighting: 50       // Controls lighting/shadow balance
   })
 
   const [selectedFeature, setSelectedFeature] = useState<string>('faceShape');
@@ -388,19 +386,48 @@ export default function CompositeEditor() {
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-6">
                 {[
-                  { key: 'skinTone', label: 'Skin Tone' },
-                  { key: 'contrast', label: 'Contrast' },
-                  { key: 'wrinkles', label: 'Wrinkles' },
-                  { key: 'hostility', label: 'Hostility' },
-                  { key: 'friendliness', label: 'Friendliness' },
-                  { key: 'happiness', label: 'Happiness' },
-                  { key: 'weight', label: 'Weight' },
-                  { key: 'hardness', label: 'Hardness' },
-                  { key: 'angular', label: 'Angular' },
+                  { 
+                    key: 'skinTone', 
+                    label: 'Skin Tone',
+                    description: 'Adjust overall skin color' 
+                  },
+                  { 
+                    key: 'contrast', 
+                    label: 'Contrast',
+                    description: 'Enhance feature definition' 
+                  },
+                  { 
+                    key: 'age', 
+                    label: 'Age',
+                    description: 'Adjust age-related characteristics' 
+                  },
+                  { 
+                    key: 'symmetry', 
+                    label: 'Symmetry',
+                    description: 'Balance facial features' 
+                  },
+                  { 
+                    key: 'sharpness', 
+                    label: 'Sharpness',
+                    description: 'Control feature clarity' 
+                  },
+                  { 
+                    key: 'blur', 
+                    label: 'Blur',
+                    description: 'Soften facial features' 
+                  },
+                  { 
+                    key: 'lighting', 
+                    label: 'Lighting',
+                    description: 'Control shadows and highlights' 
+                  }
                 ].map((attr) => (
                   <div key={attr.key} className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">{attr.label}</span>
+                      <div>
+                        <span className="text-sm">{attr.label}</span>
+                        <p className="text-xs text-muted-foreground">{attr.description}</p>
+                      </div>
                       <span className="text-xs text-muted-foreground w-8 text-right">
                         {attributes[attr.key as keyof typeof attributes]}%
                       </span>
@@ -1858,8 +1885,7 @@ export default function CompositeEditor() {
                   { icon: <Layers className="h-5 w-5" />, label: "Layers" },
                   { icon: <Move className="h-5 w-5" />, label: "Feature Adjustment" },
                   { icon: <ImageIcon className="h-5 w-5" />, label: "Feature Selection" },
-                  { icon: <Sliders className="h-5 w-5" />, label: "Attributes" },
-                  { icon: <ArrowDownUp className="h-5 w-5" />, label: "Transform" }
+                  { icon: <Sliders className="h-5 w-5" />, label: "Attributes" }
                 ].map((tool) => (
                   <Button 
                     key={tool.label}

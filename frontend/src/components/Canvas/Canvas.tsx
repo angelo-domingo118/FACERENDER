@@ -25,6 +25,7 @@ interface CanvasRef {
   flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => void
   adjustSkinTone: (value: number, skinAnalysis?: SkinAnalysisResult) => void
   adjustContrast: (value: number) => void
+  adjustSharpness: (value: number) => void
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
@@ -150,6 +151,57 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
     layerRef.current?.batchDraw();
   };
 
+  const applySharpnessFilter = (value: number) => {
+    console.log('Applying sharpness adjustment with value:', value);
+    
+    // Debounce the filter application
+    if (window.requestAnimationFrame) {
+      window.requestAnimationFrame(() => {
+        imagesRef.current.forEach((image, id) => {
+          const category = id.split('_')[0];
+          let currentFilters = image.filters() || [];
+          
+          // Reset filters if value is at neutral (50)
+          if (value === 50) {
+            currentFilters = currentFilters.filter(
+              filter => filter !== Konva.Filters.Enhance
+            );
+            image.filters(currentFilters);
+            image.enhance(0);
+          } else {
+            // Add Enhance filter if not present
+            if (!currentFilters.includes(Konva.Filters.Enhance)) {
+              currentFilters.push(Konva.Filters.Enhance);
+            }
+            
+            image.filters(currentFilters);
+            
+            // More subtle normalization range
+            const normalizedValue = (value - 50) / 100; // Reduced range for subtler effect
+            
+            // Reduced multipliers for more subtle effect
+            const sharpnessMultiplier = 
+              category === 'face' ? 0.3 :     // Reduced from 0.5
+              category === 'eyes' ? 0.6 :     // Reduced from 1.2
+              category === 'eyebrows' ? 0.4 : // Reduced from 0.8
+              category === 'nose' ? 0.3 :     // Reduced from 0.6
+              category === 'mouth' ? 0.3 :    // Reduced from 0.7
+              0.3;                           // Default
+            
+            // Apply single enhance filter for better performance
+            image.enhance(normalizedValue * sharpnessMultiplier);
+          }
+          
+          // Cache the result
+          image.cache();
+        });
+        
+        // Single batch draw for better performance
+        layerRef.current?.batchDraw();
+      });
+    }
+  };
+
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     addFeature: (feature: any) => {
@@ -228,6 +280,10 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
     },
     adjustContrast: (value: number) => {
       applyContrastFilter(value);
+    },
+    adjustSharpness: (value: number) => {
+      console.log('adjustSharpness called with value:', value);
+      applySharpnessFilter(value);
     }
   }))
 

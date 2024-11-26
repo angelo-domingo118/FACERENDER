@@ -41,6 +41,7 @@ import { DraggableLayer } from "@/components/DraggableLayer"
 import { toast } from "react-hot-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { analyzeFacialSkin } from '@/lib/skinAnalysis';
+import { debounce } from 'lodash';
 
 interface TransformSettings {
   face: {
@@ -75,6 +76,7 @@ interface CanvasRef {
   scaleFeature: (featureType: string, scaleX: number, scaleY: number) => void
   flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => void
   adjustContrast: (value: number) => void
+  adjustSharpness: (value: number) => void
 }
 
 interface CompositeState {
@@ -135,14 +137,13 @@ export default function CompositeEditor() {
   // Dummy layers data
   const [layers, setLayers] = useState<Layer[]>([])
 
-  // Update attributes state
+  // Update attributes state - remove symmetry
   const [attributes, setAttributes] = useState({
-    skinTone: 0,
-    contrast: 0,
-    symmetry: 50,      // Controls facial symmetry
-    sharpness: 50,     // Controls feature definition/clarity
-    blur: 50,         // Controls feature softness/blur
-    lighting: 50       // Controls lighting/shadow balance
+    skinTone: 50,
+    contrast: 50,
+    sharpness: 50,
+    blur: 50,
+    lighting: 50
   })
 
   const [selectedFeature, setSelectedFeature] = useState<string>('faceShape');
@@ -392,7 +393,8 @@ export default function CompositeEditor() {
                   { 
                     key: 'skinTone', 
                     label: 'Skin Tone',
-                    description: 'Adjust overall skin color' 
+                    description: 'Adjust overall skin color',
+                    onChange: handleSkinToneChange 
                   },
                   { 
                     key: 'contrast', 
@@ -401,14 +403,10 @@ export default function CompositeEditor() {
                     onChange: handleContrastChange 
                   },
                   { 
-                    key: 'symmetry', 
-                    label: 'Symmetry',
-                    description: 'Balance facial features' 
-                  },
-                  { 
                     key: 'sharpness', 
                     label: 'Sharpness',
-                    description: 'Control feature clarity' 
+                    description: 'Control feature clarity',
+                    onChange: handleSharpnessChange
                   },
                   { 
                     key: 'blur', 
@@ -437,16 +435,15 @@ export default function CompositeEditor() {
                       max={100}
                       step={1}
                       onValueChange={([value]) => {
-                        console.log('Slider value changed:', { key: attr.key, value });
-                        if (attr.key === 'skinTone') {
-                          handleSkinToneChange(value);
-                        } else if (attr.key === 'contrast') {
-                          handleContrastChange(value);
+                        console.log(`${attr.key} slider value changed:`, value);
+                        if (attr.onChange) {
+                          attr.onChange(value);
+                        } else {
+                          setAttributes(prev => ({
+                            ...prev,
+                            [attr.key]: value
+                          }));
                         }
-                        setAttributes(prev => ({
-                          ...prev,
-                          [attr.key]: value
-                        }));
                       }}
                       className="w-full"
                     />
@@ -1758,6 +1755,21 @@ export default function CompositeEditor() {
     if (canvasRef.current) {
       canvasRef.current.adjustContrast(value);
     }
+  };
+
+  const debouncedSharpnessChange = debounce((value: number) => {
+    if (canvasRef.current) {
+      canvasRef.current.adjustSharpness(value);
+    }
+  }, 16); // Debounce to roughly match 60fps
+
+  const handleSharpnessChange = (value: number) => {
+    setAttributes(prev => ({
+      ...prev,
+      sharpness: value
+    }));
+    
+    debouncedSharpnessChange(value);
   };
 
   return (

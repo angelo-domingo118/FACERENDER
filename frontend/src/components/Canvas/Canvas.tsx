@@ -24,6 +24,7 @@ interface CanvasRef {
   scaleFeature: (featureType: string, scaleX: number, scaleY: number) => void
   flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => void
   adjustSkinTone: (value: number, skinAnalysis?: SkinAnalysisResult) => void
+  adjustContrast: (value: number) => void
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
@@ -37,8 +38,6 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
     console.log('applySkinToneFilter called:', { value, skinAnalysis });
     const normalizedValue = value / 100;
     console.log('Normalized value:', normalizedValue);
-    
-    console.log('Current images in ref:', Array.from(imagesRef.current.keys()));
     
     imagesRef.current.forEach((image, id) => {
       console.log('Processing image:', { id });
@@ -56,48 +55,98 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
         'ears'
       ].includes(category);
 
-      console.log('Image skin detection:', { id, category, hasSkin });
-      
       if (hasSkin) {
-        console.log('Applying filters to image:', id);
-        image.filters([Konva.Filters.HSL]);
-        
-        // Use dominant color analysis for more accurate adjustments
-        if (skinAnalysis?.dominantColor) {
-          const { h, s, l } = skinAnalysis.dominantColor;
-          console.log('Applying HSL adjustments:', { id, h, s, l, normalizedValue });
+        // If value is 0, remove all HSL filters
+        if (value === 0) {
+          const currentFilters = image.filters() || [];
+          const newFilters = currentFilters.filter(filter => filter !== Konva.Filters.HSL);
+          image.filters(newFilters);
           
-          // Adjust filter strength based on feature type
-          const strengthMultiplier = category === 'face' || category === 'nose' ? 1.0 :
-                                   category === 'mouth' ? 0.8 :
-                                   category === 'eyes' || category === 'eyebrows' ? 0.6 :
-                                   0.7; // default for other features
-          
-          // Apply adjusted HSL values
-          image.saturation(Math.max(0, Math.min(1, s/100 + (normalizedValue * 0.3 * strengthMultiplier))));
-          
-          const lightnessAdjustment = normalizedValue * 0.2 * strengthMultiplier;
-          image.brightness(Math.max(0, Math.min(1, l/100 + lightnessAdjustment)));
-          
-          // Add slight warmth adjustment for more natural look
-          const warmth = normalizedValue > 0 ? normalizedValue * 0.1 * strengthMultiplier : 0;
-          image.hue(warmth);
+          // Reset HSL values
+          image.saturation(1);
+          image.brightness(1);
+          image.hue(0);
         } else {
-          // Fallback adjustments with feature-specific strength
-          const strengthMultiplier = category === 'face' || category === 'nose' ? 1.0 :
-                                   category === 'mouth' ? 0.8 :
-                                   category === 'eyes' || category === 'eyebrows' ? 0.6 :
-                                   0.7;
-                                   
-          image.saturation(0.5 + (normalizedValue * 0.2 * strengthMultiplier));
-          image.brightness(0.5 + (normalizedValue * 0.15 * strengthMultiplier));
+          // Apply HSL filters as before
+          let currentFilters = image.filters() || [];
+          if (!currentFilters.includes(Konva.Filters.HSL)) {
+            currentFilters.push(Konva.Filters.HSL);
+            image.filters(currentFilters);
+          }
+          
+          // Rest of your existing filter application code
+          if (skinAnalysis?.dominantColor) {
+            const { h, s, l } = skinAnalysis.dominantColor;
+            const strengthMultiplier = category === 'face' || category === 'nose' ? 1.0 :
+                                     category === 'mouth' ? 0.8 :
+                                     category === 'eyes' || category === 'eyebrows' ? 0.6 :
+                                     0.7;
+            
+            image.saturation(Math.max(0, Math.min(1, s/100 + (normalizedValue * 0.3 * strengthMultiplier))));
+            const lightnessAdjustment = normalizedValue * 0.2 * strengthMultiplier;
+            image.brightness(Math.max(0, Math.min(1, l/100 + lightnessAdjustment)));
+            const warmth = normalizedValue > 0 ? normalizedValue * 0.1 * strengthMultiplier : 0;
+            image.hue(warmth);
+          } else {
+            // Fallback adjustments
+            const strengthMultiplier = category === 'face' || category === 'nose' ? 1.0 :
+                                     category === 'mouth' ? 0.8 :
+                                     category === 'eyes' || category === 'eyebrows' ? 0.6 :
+                                     0.7;
+            
+            image.saturation(0.5 + (normalizedValue * 0.2 * strengthMultiplier));
+            image.brightness(0.5 + (normalizedValue * 0.15 * strengthMultiplier));
+          }
         }
         
         image.cache();
       }
     });
     
-    console.log('Calling batchDraw...');
+    layerRef.current?.batchDraw();
+  };
+
+  const applyContrastFilter = (value: number) => {
+    console.log('Applying contrast adjustment:', value);
+    // Increase the contrast range by using a larger multiplier
+    const normalizedValue = ((value - 50) / 50) * 8; // Changed from 4 to 8 for stronger effect
+    
+    imagesRef.current.forEach((image, id) => {
+      // Get category for feature-specific adjustments
+      const category = id.split('_')[0];
+      
+      // Preserve existing filters (like HSL) and add Contrast if not present
+      let currentFilters = image.filters() || [];
+      if (!currentFilters.includes(Konva.Filters.Contrast)) {
+        currentFilters.push(Konva.Filters.Contrast);
+      }
+      
+      // Make sure we're not losing HSL filters if they exist
+      if (!currentFilters.includes(Konva.Filters.HSL) && 
+          category === 'face') {
+        currentFilters.push(Konva.Filters.HSL);
+      }
+      
+      // Apply all filters
+      image.filters(currentFilters);
+      
+      // Increased multipliers for stronger contrast
+      const contrastMultiplier = 
+        category === 'face' ? 1.5 :    // Increased from 1.2
+        category === 'eyes' ? 2.0 :    // Increased from 1.5
+        category === 'eyebrows' ? 1.8 : // Increased from 1.3
+        category === 'nose' ? 1.5 :    // Increased from 1.2
+        category === 'mouth' ? 1.4 :   // Increased from 1.1
+        1.3;                          // Increased from 1.0
+      
+      // Apply contrast with multiplier
+      image.contrast(normalizedValue * contrastMultiplier);
+      
+      // Important: Cache the result
+      image.cache();
+    });
+    
+    // Force redraw
     layerRef.current?.batchDraw();
   };
 
@@ -176,6 +225,9 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
     adjustSkinTone: (value: number, skinAnalysis?: SkinAnalysisResult) => {
       console.log('adjustSkinTone ref method called:', { value });
       applySkinToneFilter(value, skinAnalysis);
+    },
+    adjustContrast: (value: number) => {
+      applyContrastFilter(value);
     }
   }))
 

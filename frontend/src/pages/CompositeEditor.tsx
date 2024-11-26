@@ -74,6 +74,7 @@ interface CanvasRef {
   rotateFeature: (featureType: string, angle: number) => void
   scaleFeature: (featureType: string, scaleX: number, scaleY: number) => void
   flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => void
+  adjustContrast: (value: number) => void
 }
 
 interface CompositeState {
@@ -137,7 +138,7 @@ export default function CompositeEditor() {
   // Update attributes state
   const [attributes, setAttributes] = useState({
     skinTone: 0,
-    contrast: 50,
+    contrast: 0,
     symmetry: 50,      // Controls facial symmetry
     sharpness: 50,     // Controls feature definition/clarity
     blur: 50,         // Controls feature softness/blur
@@ -396,7 +397,8 @@ export default function CompositeEditor() {
                   { 
                     key: 'contrast', 
                     label: 'Contrast',
-                    description: 'Enhance feature definition' 
+                    description: 'Enhance feature definition',
+                    onChange: handleContrastChange 
                   },
                   { 
                     key: 'symmetry', 
@@ -438,6 +440,8 @@ export default function CompositeEditor() {
                         console.log('Slider value changed:', { key: attr.key, value });
                         if (attr.key === 'skinTone') {
                           handleSkinToneChange(value);
+                        } else if (attr.key === 'contrast') {
+                          handleContrastChange(value);
                         }
                         setAttributes(prev => ({
                           ...prev,
@@ -1741,6 +1745,18 @@ export default function CompositeEditor() {
         description: error instanceof Error ? error.message : "Failed to apply skin tone adjustment",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleContrastChange = (value: number) => {
+    console.log('Handling contrast change:', value);
+    setAttributes(prev => ({
+      ...prev,
+      contrast: value
+    }));
+
+    if (canvasRef.current) {
+      canvasRef.current.adjustContrast(value);
     }
   };
 

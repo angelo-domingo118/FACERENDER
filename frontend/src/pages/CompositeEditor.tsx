@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { 
-  FileIcon, Save, Printer, Undo, Redo,
+  FileIcon, Save, Download, Undo, Redo,
   Layers, Sliders, Move, 
   ImageIcon, 
   ArrowDownUp, PanelLeftClose, PanelLeftOpen,
@@ -19,6 +19,7 @@ import {
   ArrowLeftRight,
   CircleDot, SmilePlus, HeadphonesIcon, Minus, CircleUser,
   ZoomOut, ZoomIn,
+  Printer,
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { Slider } from "@/components/ui/slider"
@@ -39,9 +40,17 @@ import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { DraggableLayer } from "@/components/DraggableLayer"
 import { toast } from "react-hot-toast"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { analyzeFacialSkin } from '@/lib/skinAnalysis';
 import { debounce } from 'lodash';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import jsPDF from 'jspdf';
 
 interface TransformSettings {
   face: {
@@ -130,6 +139,11 @@ interface PreviewDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface ExportSettings {
+  fileType: string;
+  quality: number;
+}
+
 export default function CompositeEditor() {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [activeTool, setActiveTool] = useState<string | null>(null)
@@ -141,9 +155,7 @@ export default function CompositeEditor() {
   const [attributes, setAttributes] = useState({
     skinTone: 50,
     contrast: 50,
-    sharpness: 50,
-    blur: 50,
-    lighting: 50
+    sharpness: 50
   })
 
   const [selectedFeature, setSelectedFeature] = useState<string>('faceShape');
@@ -407,16 +419,6 @@ export default function CompositeEditor() {
                     label: 'Sharpness',
                     description: 'Control feature clarity',
                     onChange: handleSharpnessChange
-                  },
-                  { 
-                    key: 'blur', 
-                    label: 'Blur',
-                    description: 'Soften facial features' 
-                  },
-                  { 
-                    key: 'lighting', 
-                    label: 'Lighting',
-                    description: 'Control shadows and highlights' 
                   }
                 ].map((attr) => (
                   <div key={attr.key} className="space-y-2">
@@ -1772,6 +1774,124 @@ export default function CompositeEditor() {
     debouncedSharpnessChange(value);
   };
 
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportSettings, setExportSettings] = useState<ExportSettings>({
+    fileType: 'png',
+    quality: 1
+  });
+
+  const handleExport = async () => {
+    if (!stageRef.current) return;
+
+    const stage = stageRef.current;
+    let dataURL;
+    
+    switch (exportSettings.fileType) {
+      case 'jpg':
+      case 'jpeg':
+        dataURL = stage.toDataURL({
+          mimeType: 'image/jpeg',
+          quality: exportSettings.quality,
+          pixelRatio: 3
+        });
+        break;
+      case 'webp':
+        dataURL = stage.toDataURL({
+          mimeType: 'image/webp',
+          quality: exportSettings.quality,
+          pixelRatio: 3
+        });
+        break;
+      case 'pdf':
+        try {
+          // Use the imported jsPDF constructor directly
+          const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'px',
+            format: [stage.width(), stage.height()]
+          });
+          
+          const imgData = stage.toDataURL({
+            pixelRatio: 3,
+            mimeType: 'image/jpeg',
+            quality: 1
+          });
+          
+          // Calculate dimensions to maintain aspect ratio
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const aspectRatio = stage.width() / stage.height();
+          
+          let imgWidth = pageWidth;
+          let imgHeight = imgWidth / aspectRatio;
+          
+          // If image height is too large, scale down based on height
+          if (imgHeight > pageHeight) {
+            imgHeight = pageHeight;
+            imgWidth = imgHeight * aspectRatio;
+          }
+          
+          // Center the image on the page
+          const x = (pageWidth - imgWidth) / 2;
+          const y = (pageHeight - imgHeight) / 2;
+          
+          pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
+          pdf.save('composite-image.pdf');
+          setShowExportDialog(false);
+          return;
+        } catch (error) {
+          console.error('PDF generation error:', error);
+          toast.error('Failed to generate PDF. Please try another format.');
+          return;
+        }
+      default: // png
+        dataURL = stage.toDataURL({
+          pixelRatio: 3
+        });
+    }
+
+    try {
+      const link = document.createElement('a');
+      link.download = `composite-image.${exportSettings.fileType}`;
+      link.href = dataURL;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setShowExportDialog(false);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export image. Please try again.');
+    }
+  };
+
+  const handlePrint = () => {
+    if (!stageRef.current) return;
+    
+    const dataURL = stageRef.current.toDataURL({ pixelRatio: 3 });
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Print Composite</title>
+            <style>
+              @media print {
+                img { 
+                  max-width: 100%;
+                  height: auto;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${dataURL}" onload="window.print();window.close()" />
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen bg-background">
@@ -1816,6 +1936,7 @@ export default function CompositeEditor() {
               "border-b",
               isCollapsed ? "p-2" : "p-6"
             )}>
+              {/* First row: New, Save, Download */}
               <div className={cn(
                 "grid place-items-center",
                 isCollapsed ? "grid-cols-1 gap-2" : "grid-cols-3 gap-6 mb-6"
@@ -1852,6 +1973,78 @@ export default function CompositeEditor() {
                   </Button>
                   {!isCollapsed && <span className="text-xs text-muted-foreground">Save</span>}
                 </div>
+                <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+                  <DialogTrigger asChild>
+                    <div className="flex flex-col items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className={cn(
+                          "rounded-lg",
+                          isCollapsed ? "h-8 w-8" : "h-10 w-10"
+                        )}
+                        title="Download"
+                      >
+                        <Download className={cn(
+                          isCollapsed ? "h-4 w-4" : "h-5 w-5"
+                        )} />
+                      </Button>
+                      {!isCollapsed && <span className="text-xs text-muted-foreground">Download</span>}
+                    </div>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Export Options</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <label>File Type</label>
+                        <Select
+                          value={exportSettings.fileType}
+                          onValueChange={(value) => setExportSettings(prev => ({ ...prev, fileType: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="png">PNG (Lossless)</SelectItem>
+                            <SelectItem value="jpg">JPG (Smaller size)</SelectItem>
+                            <SelectItem value="webp">WebP (Modern format)</SelectItem>
+                            <SelectItem value="pdf">PDF (Document)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {(exportSettings.fileType === 'jpg' || exportSettings.fileType === 'webp') && (
+                        <div className="grid gap-2">
+                          <label>Quality</label>
+                          <Slider
+                            value={[exportSettings.quality * 100]}
+                            onValueChange={([value]) => setExportSettings(prev => ({ ...prev, quality: value / 100 }))}
+                            min={1}
+                            max={100}
+                            step={1}
+                          />
+                          <span className="text-sm text-muted-foreground">{Math.round(exportSettings.quality * 100)}%</span>
+                        </div>
+                      )}
+                      <div className="flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => setShowExportDialog(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleExport}>
+                          Export
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Second row: Print, Undo, Redo */}
+              <div className={cn(
+                "grid place-items-center",
+                isCollapsed ? "grid-cols-1 gap-2" : "grid-cols-3 gap-6"
+              )}>
                 <div className="flex flex-col items-center gap-1">
                   <Button 
                     variant="ghost" 
@@ -1861,6 +2054,7 @@ export default function CompositeEditor() {
                       isCollapsed ? "h-8 w-8" : "h-10 w-10"
                     )}
                     title="Print"
+                    onClick={handlePrint}
                   >
                     <Printer className={cn(
                       isCollapsed ? "h-4 w-4" : "h-5 w-5"
@@ -1868,11 +2062,6 @@ export default function CompositeEditor() {
                   </Button>
                   {!isCollapsed && <span className="text-xs text-muted-foreground">Print</span>}
                 </div>
-              </div>
-              <div className={cn(
-                "grid place-items-center",
-                isCollapsed ? "grid-cols-1 gap-2" : "grid-cols-2 gap-6"
-              )}>
                 <div className="flex flex-col items-center gap-1">
                   <Button 
                     variant="ghost" 

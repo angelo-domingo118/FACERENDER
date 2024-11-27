@@ -90,6 +90,10 @@ interface CanvasRef {
   flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => void
   adjustContrast: (value: number) => void
   adjustSharpness: (value: number) => void
+  resetAllFilters: () => void;
+  adjustPoliceSketchEffect: (value: number) => void;
+  adjustLineWeight: (value: number) => void;
+  adjustTextureIntensity: (value: number) => void;
 }
 
 interface CompositeState {
@@ -372,14 +376,12 @@ export default function CompositeEditor() {
           </div>
           <ScrollArea className="flex-1">
             <div className="p-4 space-y-6">
-              {/* Style Presets */}
+              {/* Style Presets - Removed charcoal and lineDrawing */}
               <div className="space-y-2">
                 <span className="text-sm font-medium">Style Presets</span>
                 {[
                   { value: 'original', label: 'Original' },
-                  { value: 'policeSketch', label: 'Police Sketch' },
-                  { value: 'charcoal', label: 'Charcoal Portrait' },
-                  { value: 'lineDrawing', label: 'Line Drawing' }
+                  { value: 'policeSketch', label: 'Police Sketch' }
                 ].map((style) => (
                   <Button
                     key={style.value}
@@ -392,10 +394,9 @@ export default function CompositeEditor() {
                 ))}
               </div>
 
-              {/* Effect Controls - Only show if not Original style */}
+              {/* Effect Controls - Modified show condition */}
               {selectedStyle !== 'original' && (
                 <>
-                  {/* Effect Controls */}
                   <div className="space-y-4">
                     <span className="text-sm font-medium">Effect Controls</span>
                     {[
@@ -410,7 +411,7 @@ export default function CompositeEditor() {
                         label: 'Line Weight',
                         min: 0,
                         max: 100,
-                        show: selectedStyle === 'policeSketch' || selectedStyle === 'lineDrawing'
+                        show: selectedStyle === 'policeSketch' // Modified to only show for police sketch
                       },
                       { 
                         key: 'textureIntensity', 
@@ -437,31 +438,6 @@ export default function CompositeEditor() {
                         </div>
                       )
                     ))}
-                  </div>
-
-                  {/* Texture Options */}
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Texture Options</span>
-                    <Select
-                      value={selectedTexture}
-                      onValueChange={handleTextureChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select texture" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[
-                          { value: 'none', label: 'None' },
-                          { value: 'paper', label: 'Paper Texture' },
-                          { value: 'canvas', label: 'Canvas Grain' },
-                          { value: 'smooth', label: 'Smooth' }
-                        ].map((texture) => (
-                          <SelectItem key={texture.value} value={texture.value}>
-                            {texture.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
                 </>
               )}
@@ -2058,53 +2034,72 @@ export default function CompositeEditor() {
 
   // Add these handlers
   const handleStyleChange = (style: string) => {
+    console.log('Changing style to:', style);
     setSelectedStyle(style);
     
     if (canvasRef.current) {
-      const node = canvasRef.current.getNode();
-      
-      // Clear existing filters when switching to original
-      if (style === 'original') {
-        node.filters([]);
-        node.cache();
-        node.draw();
-        return;
-      }
-      
-      // Apply the style filter using Konva
-      node.filters([]);  // Clear existing filters first
-      
       switch(style) {
+        case 'original':
+          // Reset all effects and filters
+          canvasRef.current.resetAllFilters();
+          setEffectControls({
+            effectStrength: 0,
+            lineWeight: 50,
+            textureIntensity: 50
+          });
+          break;
+          
         case 'policeSketch':
-          // Add police sketch filter logic
-          node.filters([Konva.Filters.Grayscale, Konva.Filters.Enhance]);
+          // First reset any existing filters
+          canvasRef.current.resetAllFilters();
+          // Then apply police sketch effect with default values
+          setEffectControls({
+            effectStrength: 100,
+            lineWeight: 50,
+            textureIntensity: 50
+          });
+          canvasRef.current.adjustPoliceSketchEffect(100);
+          canvasRef.current.adjustLineWeight(50);
+          canvasRef.current.adjustTextureIntensity(50);
           break;
-        case 'charcoal':
-          // Add charcoal filter logic
-          node.filters([Konva.Filters.Grayscale, Konva.Filters.Contrast]);
-          break;
-        case 'lineDrawing':
-          // Add line drawing filter logic
-          node.filters([Konva.Filters.Threshold]);
-          break;
+          
+        // ... other cases
       }
-      
-      node.cache();
-      node.draw();
     }
   };
 
+  // Update handleEffectControlChange to handle debounced updates
   const handleEffectControlChange = (key: string, value: number) => {
+    // Update UI immediately
     setEffectControls(prev => ({
       ...prev,
       [key]: value
     }));
-    // Apply effect intensity using Konva filters
+    
     if (canvasRef.current) {
-      const node = canvasRef.current.getNode();
-      // Update filter parameters based on control values
-      node.cache();
-      node.draw();
+      switch(selectedStyle) {
+        case 'policeSketch':
+          switch(key) {
+            case 'effectStrength':
+              // Cancel any pending debounced calls when value is 0
+              if (value === 0) {
+                canvasRef.current.resetAllFilters();
+                setSelectedStyle('original');
+              } else {
+                canvasRef.current.adjustPoliceSketchEffect(value);
+              }
+              break;
+              
+            case 'lineWeight':
+              canvasRef.current.adjustLineWeight(value);
+              break;
+              
+            case 'textureIntensity':
+              canvasRef.current.adjustTextureIntensity(value);
+              break;
+          }
+          break;
+      }
     }
   };
 

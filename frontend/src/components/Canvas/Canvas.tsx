@@ -2,6 +2,7 @@ import { Stage, Layer, Image } from 'react-konva'
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { KonvaEventObject } from 'konva/lib/Node'
 import Konva from 'konva'
+import { debounce } from 'lodash';
 
 interface CanvasProps {
   width: number
@@ -26,6 +27,10 @@ interface CanvasRef {
   adjustSkinTone: (value: number, skinAnalysis?: SkinAnalysisResult) => void
   adjustContrast: (value: number) => void
   adjustSharpness: (value: number) => void
+  adjustPoliceSketchEffect: (value: number) => void
+  adjustLineWeight: (value: number) => void
+  adjustTextureIntensity: (value: number) => void
+  resetAllFilters: () => void
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
@@ -202,6 +207,127 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
     }
   };
 
+  const resetAllFilters = () => {
+    console.log('Resetting all filters');
+    
+    imagesRef.current.forEach((image) => {
+      let currentFilters = image.filters() || [];
+      
+      // Remove all artistic effect filters
+      currentFilters = currentFilters.filter(filter => 
+        filter !== Konva.Filters.Grayscale &&
+        filter !== Konva.Filters.Contrast &&
+        filter !== Konva.Filters.Enhance &&
+        filter !== Konva.Filters.Noise
+      );
+      
+      // Apply cleaned filters array
+      image.filters(currentFilters);
+      
+      // Reset all filter values
+      image.contrast(1);
+      image.enhance(0);
+      image.brightness(1);
+      image.saturation(1);
+      image.noise(0);
+      
+      // Cache the result
+      image.cache();
+    });
+
+    // Redraw the layer
+    layerRef.current?.batchDraw();
+  };
+
+  const adjustPoliceSketchEffect = debounce((value: number) => {
+    console.log('Applying police sketch effect with value:', value);
+    
+    if (value === 0) {
+      resetAllFilters();
+      return;
+    }
+
+    // Use requestAnimationFrame for better performance
+    requestAnimationFrame(() => {
+      const normalizedValue = value / 100;
+
+      imagesRef.current.forEach((image) => {
+        // Get current filters
+        let currentFilters = image.filters() || [];
+        const hasGrayscale = currentFilters.includes(Konva.Filters.Grayscale);
+        const hasContrast = currentFilters.includes(Konva.Filters.Contrast);
+        const hasEnhance = currentFilters.includes(Konva.Filters.Enhance);
+        
+        // Only update filters if they changed
+        if (!hasGrayscale || !hasContrast || !hasEnhance) {
+          // Add required filters if not present
+          if (!hasGrayscale) currentFilters.push(Konva.Filters.Grayscale);
+          if (!hasContrast) currentFilters.push(Konva.Filters.Contrast);
+          if (!hasEnhance) currentFilters.push(Konva.Filters.Enhance);
+          
+          // Apply filters once
+          image.filters(currentFilters);
+        }
+        
+        // Apply filter values
+        if (value > 0) {
+          image.contrast(1 + normalizedValue * 2);
+          image.enhance(normalizedValue * 0.5);
+        }
+        
+        // Cache the result
+        image.cache();
+      });
+
+      // Single batch draw for all changes
+      layerRef.current?.batchDraw();
+    });
+  }, 16); // 60fps throttle
+
+  const adjustLineWeight = debounce((value: number) => {
+    console.log('Adjusting line weight:', value);
+    
+    requestAnimationFrame(() => {
+      const normalizedValue = value / 100;
+      
+      imagesRef.current.forEach((image) => {
+        let currentFilters = image.filters() || [];
+        
+        if (!currentFilters.includes(Konva.Filters.Enhance)) {
+          currentFilters.push(Konva.Filters.Enhance);
+          image.filters(currentFilters);
+        }
+        
+        image.enhance(normalizedValue * 0.7);
+        image.cache();
+      });
+      
+      layerRef.current?.batchDraw();
+    });
+  }, 16);
+
+  const adjustTextureIntensity = debounce((value: number) => {
+    console.log('Adjusting texture intensity:', value);
+    
+    requestAnimationFrame(() => {
+      const normalizedValue = value / 100;
+      
+      imagesRef.current.forEach((image) => {
+        let currentFilters = image.filters() || [];
+        
+        if (!currentFilters.includes(Konva.Filters.Noise)) {
+          currentFilters.push(Konva.Filters.Noise);
+          image.filters(currentFilters);
+        }
+        
+        image.noise(normalizedValue * 0.3);
+        image.cache();
+      });
+      
+      layerRef.current?.batchDraw();
+    });
+  }, 16);
+
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     addFeature: (feature: any) => {
@@ -284,7 +410,11 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
     adjustSharpness: (value: number) => {
       console.log('adjustSharpness called with value:', value);
       applySharpnessFilter(value);
-    }
+    },
+    adjustPoliceSketchEffect,
+    adjustLineWeight,
+    adjustTextureIntensity,
+    resetAllFilters
   }))
 
   useEffect(() => {

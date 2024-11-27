@@ -20,6 +20,7 @@ import {
   CircleDot, SmilePlus, HeadphonesIcon, Minus, CircleUser,
   ZoomOut, ZoomIn,
   Printer,
+  Brush,
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { Slider } from "@/components/ui/slider"
@@ -52,6 +53,8 @@ import {
 } from "@/components/ui/select"
 import jsPDF from 'jspdf';
 import { Stage } from 'konva';
+import { NewCompositeDialog } from "@/components/dialogs/NewCompositeDialog"
+import Konva from 'konva';
 
 interface TransformSettings {
   face: {
@@ -355,6 +358,113 @@ export default function CompositeEditor() {
                   </div>
                 )}
               </div>
+            </div>
+          </ScrollArea>
+        </div>
+      );
+    }
+
+    if (activeTool === "Artistic Effects") {
+      return (
+        <div className="w-[320px] border-l flex flex-col bg-background">
+          <div className="p-4 border-b">
+            <span className="font-medium">Artistic Effects</span>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-6">
+              {/* Style Presets */}
+              <div className="space-y-2">
+                <span className="text-sm font-medium">Style Presets</span>
+                {[
+                  { value: 'original', label: 'Original' },
+                  { value: 'policeSketch', label: 'Police Sketch' },
+                  { value: 'charcoal', label: 'Charcoal Portrait' },
+                  { value: 'lineDrawing', label: 'Line Drawing' }
+                ].map((style) => (
+                  <Button
+                    key={style.value}
+                    variant={selectedStyle === style.value ? "secondary" : "outline"}
+                    className="w-full justify-start h-9"
+                    onClick={() => handleStyleChange(style.value)}
+                  >
+                    <span className="text-sm">{style.label}</span>
+                  </Button>
+                ))}
+              </div>
+
+              {/* Effect Controls - Only show if not Original style */}
+              {selectedStyle !== 'original' && (
+                <>
+                  {/* Effect Controls */}
+                  <div className="space-y-4">
+                    <span className="text-sm font-medium">Effect Controls</span>
+                    {[
+                      { 
+                        key: 'effectStrength', 
+                        label: 'Effect Strength',
+                        min: 0,
+                        max: 100
+                      },
+                      { 
+                        key: 'lineWeight', 
+                        label: 'Line Weight',
+                        min: 0,
+                        max: 100,
+                        show: selectedStyle === 'policeSketch' || selectedStyle === 'lineDrawing'
+                      },
+                      { 
+                        key: 'textureIntensity', 
+                        label: 'Texture Intensity',
+                        min: 0,
+                        max: 100
+                      }
+                    ].map((control) => (
+                      control.show !== false && (
+                        <div key={control.key} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">{control.label}</span>
+                            <span className="text-xs text-muted-foreground w-8 text-right">
+                              {effectControls[control.key]}%
+                            </span>
+                          </div>
+                          <Slider
+                            value={[effectControls[control.key]]}
+                            min={control.min}
+                            max={control.max}
+                            step={1}
+                            onValueChange={([value]) => handleEffectControlChange(control.key, value)}
+                          />
+                        </div>
+                      )
+                    ))}
+                  </div>
+
+                  {/* Texture Options */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Texture Options</span>
+                    <Select
+                      value={selectedTexture}
+                      onValueChange={handleTextureChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select texture" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[
+                          { value: 'none', label: 'None' },
+                          { value: 'paper', label: 'Paper Texture' },
+                          { value: 'canvas', label: 'Canvas Grain' },
+                          { value: 'smooth', label: 'Smooth' }
+                        ].map((texture) => (
+                          <SelectItem key={texture.value} value={texture.value}>
+                            {texture.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
             </div>
           </ScrollArea>
         </div>
@@ -1908,6 +2018,107 @@ export default function CompositeEditor() {
     }
   };
 
+  const [showNewDialog, setShowNewDialog] = useState(false)
+
+  // Add handler for new button click
+  const handleNew = () => {
+    setShowNewDialog(true)
+  }
+
+  const handleNewComposite = (formData: FormData) => {
+    // Reset current canvas/features
+    setLayers([])
+    setSelectedFeatureId(null)
+    setFeatures([])
+    
+    // Reset zoom and other settings
+    setZoom(190)
+    setAttributes({
+      skinTone: 50,
+      contrast: 50,
+      sharpness: 50
+    })
+
+    // You might want to save the form data to state or context
+    // for reference later
+    console.log('New composite form data:', formData)
+
+    // Show success message
+    toast.success('New composite created')
+  }
+
+  // Add these state variables
+  const [selectedStyle, setSelectedStyle] = useState('original');
+  const [selectedTexture, setSelectedTexture] = useState('none');
+  const [effectControls, setEffectControls] = useState({
+    effectStrength: 100,
+    lineWeight: 50,
+    textureIntensity: 50
+  });
+
+  // Add these handlers
+  const handleStyleChange = (style: string) => {
+    setSelectedStyle(style);
+    
+    if (canvasRef.current) {
+      const node = canvasRef.current.getNode();
+      
+      // Clear existing filters when switching to original
+      if (style === 'original') {
+        node.filters([]);
+        node.cache();
+        node.draw();
+        return;
+      }
+      
+      // Apply the style filter using Konva
+      node.filters([]);  // Clear existing filters first
+      
+      switch(style) {
+        case 'policeSketch':
+          // Add police sketch filter logic
+          node.filters([Konva.Filters.Grayscale, Konva.Filters.Enhance]);
+          break;
+        case 'charcoal':
+          // Add charcoal filter logic
+          node.filters([Konva.Filters.Grayscale, Konva.Filters.Contrast]);
+          break;
+        case 'lineDrawing':
+          // Add line drawing filter logic
+          node.filters([Konva.Filters.Threshold]);
+          break;
+      }
+      
+      node.cache();
+      node.draw();
+    }
+  };
+
+  const handleEffectControlChange = (key: string, value: number) => {
+    setEffectControls(prev => ({
+      ...prev,
+      [key]: value
+    }));
+    // Apply effect intensity using Konva filters
+    if (canvasRef.current) {
+      const node = canvasRef.current.getNode();
+      // Update filter parameters based on control values
+      node.cache();
+      node.draw();
+    }
+  };
+
+  const handleTextureChange = (texture: string) => {
+    setSelectedTexture(texture);
+    // Apply texture using Konva
+    if (canvasRef.current) {
+      const node = canvasRef.current.getNode();
+      // Apply texture overlay
+      node.cache();
+      node.draw();
+    }
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen bg-background">
@@ -1966,6 +2177,7 @@ export default function CompositeEditor() {
                       isCollapsed ? "h-8 w-8" : "h-10 w-10"
                     )}
                     title="New"
+                    onClick={handleNew}
                   >
                     <FileIcon className={cn(
                       isCollapsed ? "h-4 w-4" : "h-5 w-5"
@@ -2151,7 +2363,8 @@ export default function CompositeEditor() {
                   { icon: <Layers className="h-5 w-5" />, label: "Layers" },
                   { icon: <Move className="h-5 w-5" />, label: "Feature Adjustment" },
                   { icon: <ImageIcon className="h-5 w-5" />, label: "Feature Selection" },
-                  { icon: <Sliders className="h-5 w-5" />, label: "Attributes" }
+                  { icon: <Sliders className="h-5 w-5" />, label: "Attributes" },
+                  { icon: <Brush className="h-5 w-5" />, label: "Artistic Effects" }
                 ].map((tool) => (
                   <Button 
                     key={tool.label}
@@ -2247,6 +2460,11 @@ export default function CompositeEditor() {
           {renderToolPanel()}
         </div>
       </div>
+      <NewCompositeDialog 
+        open={showNewDialog}
+        onOpenChange={setShowNewDialog}
+        onSubmit={handleNewComposite}
+      />
     </DndProvider>
   )
 } 

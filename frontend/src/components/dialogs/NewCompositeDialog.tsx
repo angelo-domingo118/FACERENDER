@@ -25,63 +25,161 @@ import { useNavigate } from "react-router-dom"
 interface NewCompositeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSubmit?: (formData: FormData) => void
 }
 
 interface FormData {
-  operatorTitle: string
-  operatorId: string
-  witnessTitle: string
+  // Operator Details
+  operatorRank: string
+  operatorFirstName: string
+  operatorLastName: string
+  operatorBadgeNumber: string
+  operatorUnit: string
+  
+  // Witness Details
   witnessFirstName: string
   witnessLastName: string
-  gender: string
-  ethnicity: string
-  ageRange: string
-  notes: string
-  isOver17: string
-  suspectDescriptionRecorded: string
-  suspectKnownAvailable: string
+  witnessAge: string
+  witnessContact: string
+  witnessAddress: string
+  
+  // Updated Incident Details
+  caseNumber: string
+  incidentType: string
+  incidentDate: string
+  incidentTime: string
+  incidentLocation: string
+  suspectGender: string
+  suspectEthnicity: string
+  suspectAgeRange: string
+  suspectHeight: string
+  suspectBuild: string
+  distinguishingFeatures: string
+  incidentNotes: string
+  
+  // Updated Verification Questions
+  witnessConsent: string
+  witnessCredibility: string
+  witnessSobriety: string
+  initialStatementRecorded: string
+  caseAssigned: string
 }
 
-export function NewCompositeDialog({ open, onOpenChange }: NewCompositeDialogProps) {
+export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewCompositeDialogProps) {
   const navigate = useNavigate()
 
   const [formData, setFormData] = useState<FormData>({
-    operatorTitle: '',
-    operatorId: '',
-    witnessTitle: '',
+    // Operator Details
+    operatorRank: '',
+    operatorFirstName: '',
+    operatorLastName: '',
+    operatorBadgeNumber: '',
+    operatorUnit: '',
+    
+    // Witness Details
     witnessFirstName: '',
     witnessLastName: '',
-    gender: '',
-    ethnicity: '',
-    ageRange: '',
-    notes: '',
-    isOver17: 'yes',
-    suspectDescriptionRecorded: 'no',
-    suspectKnownAvailable: 'no'
+    witnessAge: '',
+    witnessContact: '',
+    witnessAddress: '',
+    
+    // Updated Incident Details
+    caseNumber: '',
+    incidentType: '',
+    incidentDate: '',
+    incidentTime: '',
+    incidentLocation: '',
+    suspectGender: '',
+    suspectEthnicity: '',
+    suspectAgeRange: '',
+    suspectHeight: '',
+    suspectBuild: '',
+    distinguishingFeatures: '',
+    incidentNotes: '',
+    
+    // Updated Verification Questions
+    witnessConsent: 'yes',
+    witnessCredibility: 'yes',
+    witnessSobriety: 'yes',
+    initialStatementRecorded: 'yes',
+    caseAssigned: 'yes'
   })
 
   const handleSubmit = () => {
-    console.log('Form submitted:', formData)
+    // Call onSubmit if provided
+    onSubmit?.(formData)
+    
+    // Reset form and close dialog
+    resetForm()
     onOpenChange(false)
+    
+    // Navigate to composite builder instead of editor
     navigate('/composite-builder')
   }
 
   const handleCancel = () => {
     setFormData({ // Reset form
-      operatorTitle: '',
-      operatorId: '',
-      witnessTitle: '',
+      operatorRank: '',
+      operatorFirstName: '',
+      operatorLastName: '',
+      operatorBadgeNumber: '',
+      operatorUnit: '',
       witnessFirstName: '',
       witnessLastName: '',
-      gender: '',
-      ethnicity: '',
-      ageRange: '',
-      notes: '',
-      isOver17: 'yes',
-      suspectDescriptionRecorded: 'no',
-      suspectKnownAvailable: 'no'
+      witnessAge: '',
+      witnessContact: '',
+      witnessAddress: '',
+      caseNumber: '',
+      incidentType: '',
+      incidentDate: '',
+      incidentTime: '',
+      incidentLocation: '',
+      suspectGender: '',
+      suspectEthnicity: '',
+      suspectAgeRange: '',
+      suspectHeight: '',
+      suspectBuild: '',
+      distinguishingFeatures: '',
+      incidentNotes: '',
+      witnessConsent: 'yes',
+      witnessCredibility: 'yes',
+      witnessSobriety: 'yes',
+      initialStatementRecorded: 'yes',
+      caseAssigned: 'yes'
     })
     onOpenChange(false)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      operatorRank: '',
+      operatorFirstName: '',
+      operatorLastName: '',
+      operatorBadgeNumber: '',
+      operatorUnit: '',
+      witnessFirstName: '',
+      witnessLastName: '',
+      witnessAge: '',
+      witnessContact: '',
+      witnessAddress: '',
+      caseNumber: '',
+      incidentType: '',
+      incidentDate: '',
+      incidentTime: '',
+      incidentLocation: '',
+      suspectGender: '',
+      suspectEthnicity: '',
+      suspectAgeRange: '',
+      suspectHeight: '',
+      suspectBuild: '',
+      distinguishingFeatures: '',
+      incidentNotes: '',
+      witnessConsent: 'yes',
+      witnessCredibility: 'yes',
+      witnessSobriety: 'yes',
+      initialStatementRecorded: 'yes',
+      caseAssigned: 'yes'
+    })
   }
 
   return (
@@ -101,23 +199,66 @@ export function NewCompositeDialog({ open, onOpenChange }: NewCompositeDialogPro
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
-          {/* Operator Details - now with better spacing and visual hierarchy */}
+          {/* Operator Details */}
           <div className="space-y-4 rounded-lg border p-4">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold">Operator Details</h3>
               <Badge variant="outline">Step 1 of 4</Badge>
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Title</Label>
-                <Input placeholder="PO1" />
+                <Label>Rank</Label>
+                <Select 
+                  value={formData.operatorRank}
+                  onValueChange={(value) => setFormData({...formData, operatorRank: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select rank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="po1">PO1</SelectItem>
+                    <SelectItem value="po2">PO2</SelectItem>
+                    <SelectItem value="po3">PO3</SelectItem>
+                    <SelectItem value="spo1">SPO1</SelectItem>
+                    <SelectItem value="spo2">SPO2</SelectItem>
+                    <SelectItem value="spo3">SPO3</SelectItem>
+                    <SelectItem value="spo4">SPO4</SelectItem>
+                    <SelectItem value="inspector">Inspector</SelectItem>
+                    <SelectItem value="superintendent">Superintendent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Badge Number</Label>
+                <Input 
+                  placeholder="Enter badge number"
+                  value={formData.operatorBadgeNumber}
+                  onChange={(e) => setFormData({...formData, operatorBadgeNumber: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>First Name</Label>
+                <Input 
+                  placeholder="Enter first name"
+                  value={formData.operatorFirstName}
+                  onChange={(e) => setFormData({...formData, operatorFirstName: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Last Name</Label>
+                <Input 
+                  placeholder="Enter last name"
+                  value={formData.operatorLastName}
+                  onChange={(e) => setFormData({...formData, operatorLastName: e.target.value})}
+                />
               </div>
               <div className="col-span-2">
-                <Label>ID Number</Label>
-                <Input placeholder="Badge number" />
-              </div>
-              <div className="flex items-end">
-                <Button variant="outline" className="w-full">Lock</Button>
+                <Label>Unit/Station</Label>
+                <Input 
+                  placeholder="Enter unit or station"
+                  value={formData.operatorUnit}
+                  onChange={(e) => setFormData({...formData, operatorUnit: e.target.value})}
+                />
               </div>
             </div>
           </div>
@@ -128,32 +269,123 @@ export function NewCompositeDialog({ open, onOpenChange }: NewCompositeDialogPro
               <h3 className="text-lg font-semibold">Witness Details</h3>
               <Badge variant="outline">Step 2 of 4</Badge>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label>Title</Label>
-                <Input />
-              </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>First Name</Label>
-                <Input />
+                <Input 
+                  placeholder="Enter first name"
+                  value={formData.witnessFirstName}
+                  onChange={(e) => setFormData({...formData, witnessFirstName: e.target.value})}
+                />
               </div>
               <div>
                 <Label>Last Name</Label>
-                <Input />
+                <Input 
+                  placeholder="Enter last name"
+                  value={formData.witnessLastName}
+                  onChange={(e) => setFormData({...formData, witnessLastName: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Age</Label>
+                <Input 
+                  type="number"
+                  placeholder="Enter age"
+                  value={formData.witnessAge}
+                  onChange={(e) => setFormData({...formData, witnessAge: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Contact Number</Label>
+                <Input 
+                  placeholder="Enter contact number"
+                  value={formData.witnessContact}
+                  onChange={(e) => setFormData({...formData, witnessContact: e.target.value})}
+                />
+              </div>
+              <div className="col-span-2">
+                <Label>Address</Label>
+                <Textarea 
+                  placeholder="Enter complete address"
+                  value={formData.witnessAddress}
+                  onChange={(e) => setFormData({...formData, witnessAddress: e.target.value})}
+                  className="resize-none"
+                  rows={3}
+                />
               </div>
             </div>
           </div>
 
-          {/* Incident Details */}
+          {/* Incident Details Section */}
           <div className="space-y-4 rounded-lg border p-4">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold">Incident Details</h3>
               <Badge variant="outline">Step 3 of 4</Badge>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Gender</Label>
-                <Select>
+                <Label>Case Number</Label>
+                <Input 
+                  placeholder="Enter case number"
+                  value={formData.caseNumber}
+                  onChange={(e) => setFormData({...formData, caseNumber: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Incident Type</Label>
+                <Select 
+                  value={formData.incidentType}
+                  onValueChange={(value) => setFormData({...formData, incidentType: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select incident type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="robbery">Robbery</SelectItem>
+                    <SelectItem value="theft">Theft</SelectItem>
+                    <SelectItem value="assault">Assault</SelectItem>
+                    <SelectItem value="homicide">Homicide</SelectItem>
+                    <SelectItem value="kidnapping">Kidnapping</SelectItem>
+                    <SelectItem value="sexual-assault">Sexual Assault</SelectItem>
+                    <SelectItem value="missing-person">Missing Person</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Incident Date</Label>
+                <Input 
+                  type="date"
+                  value={formData.incidentDate}
+                  onChange={(e) => setFormData({...formData, incidentDate: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Incident Time</Label>
+                <Input 
+                  type="time"
+                  value={formData.incidentTime}
+                  onChange={(e) => setFormData({...formData, incidentTime: e.target.value})}
+                />
+              </div>
+              <div className="col-span-2">
+                <Label>Incident Location</Label>
+                <Textarea 
+                  placeholder="Enter complete incident location"
+                  value={formData.incidentLocation}
+                  onChange={(e) => setFormData({...formData, incidentLocation: e.target.value})}
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mt-4">
+              <div>
+                <Label>Suspect Gender</Label>
+                <Select 
+                  value={formData.suspectGender}
+                  onValueChange={(value) => setFormData({...formData, suspectGender: value})}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
@@ -164,8 +396,11 @@ export function NewCompositeDialog({ open, onOpenChange }: NewCompositeDialogPro
                 </Select>
               </div>
               <div>
-                <Label>Ethnicity</Label>
-                <Select>
+                <Label>Suspect Ethnicity</Label>
+                <Select 
+                  value={formData.suspectEthnicity}
+                  onValueChange={(value) => setFormData({...formData, suspectEthnicity: value})}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select ethnicity" />
                   </SelectTrigger>
@@ -173,32 +408,83 @@ export function NewCompositeDialog({ open, onOpenChange }: NewCompositeDialogPro
                     <SelectItem value="tagalog">Tagalog</SelectItem>
                     <SelectItem value="cebuano">Cebuano</SelectItem>
                     <SelectItem value="ilocano">Ilocano</SelectItem>
-                    {/* Add more Filipino ethnicities */}
+                    <SelectItem value="bicolano">Bicolano</SelectItem>
+                    <SelectItem value="waray">Waray</SelectItem>
+                    <SelectItem value="kapampangan">Kapampangan</SelectItem>
+                    <SelectItem value="chinese-filipino">Chinese Filipino</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Age Range</Label>
-                <Select>
+                <Label>Suspect Age Range</Label>
+                <Select 
+                  value={formData.suspectAgeRange}
+                  onValueChange={(value) => setFormData({...formData, suspectAgeRange: value})}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select age" />
+                    <SelectValue placeholder="Select age range" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="minor">Below 18</SelectItem>
                     <SelectItem value="18-25">18-25</SelectItem>
                     <SelectItem value="26-35">26-35</SelectItem>
                     <SelectItem value="36-45">36-45</SelectItem>
-                    <SelectItem value="46+">46+</SelectItem>
+                    <SelectItem value="46-55">46-55</SelectItem>
+                    <SelectItem value="56+">56 and above</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Suspect Height (cm)</Label>
+                <Input 
+                  type="number"
+                  placeholder="Height in cm"
+                  value={formData.suspectHeight}
+                  onChange={(e) => setFormData({...formData, suspectHeight: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Body Build</Label>
+                <Select 
+                  value={formData.suspectBuild}
+                  onValueChange={(value) => setFormData({...formData, suspectBuild: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select build" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="slim">Slim</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="heavy">Heavy</SelectItem>
+                    <SelectItem value="muscular">Muscular</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="mt-2">
-              <Label>Notes</Label>
-              <Textarea placeholder="Additional details about the incident..." />
+
+            <div>
+              <Label>Distinguishing Features</Label>
+              <Textarea 
+                placeholder="Scars, tattoos, birthmarks, etc."
+                value={formData.distinguishingFeatures}
+                onChange={(e) => setFormData({...formData, distinguishingFeatures: e.target.value})}
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <Label>Additional Notes</Label>
+              <Textarea 
+                placeholder="Any other relevant details about the incident or suspect..."
+                value={formData.incidentNotes}
+                onChange={(e) => setFormData({...formData, incidentNotes: e.target.value})}
+                rows={3}
+              />
             </div>
           </div>
 
-          {/* Additional Questions */}
+          {/* Verification Questions */}
           <div className="space-y-4 rounded-lg border p-4">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold">Verification Questions</h3>
@@ -206,64 +492,82 @@ export function NewCompositeDialog({ open, onOpenChange }: NewCompositeDialogPro
             </div>
             
             <div className="grid gap-6">
-              {/* Existing question */}
               <div className="space-y-3">
                 <Label className="text-base">
-                  Is the witness over 17 years old OR is there a suitable guardian present?
+                  Has the witness given consent for the composite sketch procedure?
                 </Label>
                 <RadioGroup 
-                  value={formData.isOver17}
-                  onValueChange={(value) => setFormData({...formData, isOver17: value})}
+                  value={formData.witnessConsent}
+                  onValueChange={(value) => setFormData({...formData, witnessConsent: value})}
                   className="flex gap-4"
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="yes" id="yes1" />
-                    <Label htmlFor="yes1">Yes</Label>
+                    <RadioGroupItem value="yes" id="consent-yes" />
+                    <Label htmlFor="consent-yes">Yes</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="no" id="no1" />
-                    <Label htmlFor="no1">No</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {/* New questions */}
-              <div className="space-y-3">
-                <Label className="text-base">
-                  Has the first description of the suspect been recorded?
-                </Label>
-                <RadioGroup 
-                  value={formData.suspectDescriptionRecorded}
-                  onValueChange={(value) => setFormData({...formData, suspectDescriptionRecorded: value})}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="yes" id="yes2" />
-                    <Label htmlFor="yes2">Yes</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="no" id="no2" />
-                    <Label htmlFor="no2">No</Label>
+                    <RadioGroupItem value="no" id="consent-no" />
+                    <Label htmlFor="consent-no">No</Label>
                   </div>
                 </RadioGroup>
               </div>
 
               <div className="space-y-3">
                 <Label className="text-base">
-                  Is the suspect known and available?
+                  Has the witness's initial statement been recorded in the police blotter?
                 </Label>
                 <RadioGroup 
-                  value={formData.suspectKnownAvailable}
-                  onValueChange={(value) => setFormData({...formData, suspectKnownAvailable: value})}
+                  value={formData.initialStatementRecorded}
+                  onValueChange={(value) => setFormData({...formData, initialStatementRecorded: value})}
                   className="flex gap-4"
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="yes" id="yes3" />
-                    <Label htmlFor="yes3">Yes</Label>
+                    <RadioGroupItem value="yes" id="statement-yes" />
+                    <Label htmlFor="statement-yes">Yes</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="no" id="no3" />
-                    <Label htmlFor="no3">No</Label>
+                    <RadioGroupItem value="no" id="statement-no" />
+                    <Label htmlFor="statement-no">No</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-base">
+                  Was the witness sober and in a proper state of mind during the incident?
+                </Label>
+                <RadioGroup 
+                  value={formData.witnessSobriety}
+                  onValueChange={(value) => setFormData({...formData, witnessSobriety: value})}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="yes" id="sober-yes" />
+                    <Label htmlFor="sober-yes">Yes</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="no" id="sober-no" />
+                    <Label htmlFor="sober-no">No</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-base">
+                  Has this case been assigned to an investigating officer?
+                </Label>
+                <RadioGroup 
+                  value={formData.caseAssigned}
+                  onValueChange={(value) => setFormData({...formData, caseAssigned: value})}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="yes" id="assigned-yes" />
+                    <Label htmlFor="assigned-yes">Yes</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="no" id="assigned-no" />
+                    <Label htmlFor="assigned-no">No</Label>
                   </div>
                 </RadioGroup>
               </div>
@@ -276,7 +580,6 @@ export function NewCompositeDialog({ open, onOpenChange }: NewCompositeDialogPro
           <Button 
             type="submit" 
             onClick={handleSubmit}
-            disabled={!formData.isOver17 || formData.suspectDescriptionRecorded === 'no'}
           >
             Proceed
           </Button>

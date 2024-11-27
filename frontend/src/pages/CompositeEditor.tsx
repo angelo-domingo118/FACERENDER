@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import jsPDF from 'jspdf';
+import { Stage } from 'konva';
 
 interface TransformSettings {
   face: {
@@ -1786,71 +1787,85 @@ export default function CompositeEditor() {
     const stage = stageRef.current;
     let dataURL;
     
-    switch (exportSettings.fileType) {
-      case 'jpg':
-      case 'jpeg':
-        dataURL = stage.toDataURL({
-          mimeType: 'image/jpeg',
-          quality: exportSettings.quality,
-          pixelRatio: 3
-        });
-        break;
-      case 'webp':
-        dataURL = stage.toDataURL({
-          mimeType: 'image/webp',
-          quality: exportSettings.quality,
-          pixelRatio: 3
-        });
-        break;
-      case 'pdf':
-        try {
-          // Use the imported jsPDF constructor directly
-          const pdf = new jsPDF({
-            orientation: 'landscape',
-            unit: 'px',
-            format: [stage.width(), stage.height()]
-          });
-          
-          const imgData = stage.toDataURL({
-            pixelRatio: 3,
-            mimeType: 'image/jpeg',
-            quality: 1
-          });
-          
-          // Calculate dimensions to maintain aspect ratio
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          const aspectRatio = stage.width() / stage.height();
-          
-          let imgWidth = pageWidth;
-          let imgHeight = imgWidth / aspectRatio;
-          
-          // If image height is too large, scale down based on height
-          if (imgHeight > pageHeight) {
-            imgHeight = pageHeight;
-            imgWidth = imgHeight * aspectRatio;
-          }
-          
-          // Center the image on the page
-          const x = (pageWidth - imgWidth) / 2;
-          const y = (pageHeight - imgHeight) / 2;
-          
-          pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
-          pdf.save('composite-image.pdf');
-          setShowExportDialog(false);
-          return;
-        } catch (error) {
-          console.error('PDF generation error:', error);
-          toast.error('Failed to generate PDF. Please try another format.');
-          return;
-        }
-      default: // png
-        dataURL = stage.toDataURL({
-          pixelRatio: 3
-        });
-    }
-
     try {
+      switch (exportSettings.fileType) {
+        case 'ai':
+        case 'eps':
+          try {
+            // Convert stage to SVG
+            const svg = stage.toDataURL({
+              pixelRatio: 3,
+              mimeType: 'image/svg+xml'
+            });
+
+            // Create download link with appropriate extension
+            const link = document.createElement('a');
+            link.download = `composite-image.${exportSettings.fileType}`;
+            link.href = svg;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            toast.success(
+              `Downloaded as SVG with .${exportSettings.fileType} extension. For full vector editing, open in Adobe Illustrator.`,
+              { duration: 5000 }
+            );
+            setShowExportDialog(false);
+            return;
+          } catch (error) {
+            console.error('Vector export error:', error);
+            toast.error(`Failed to generate ${exportSettings.fileType.toUpperCase()} file. Falling back to SVG format.`);
+            return;
+          }
+
+        case 'pdf':
+          try {
+            const pdf = new jsPDF({
+              orientation: 'landscape',
+              unit: 'px',
+              format: [stage.width(), stage.height()]
+            });
+            
+            const imgData = stage.toDataURL({
+              pixelRatio: 3,
+              mimeType: 'image/jpeg',
+              quality: 1
+            });
+            
+            pdf.addImage(imgData, 'JPEG', 0, 0, stage.width(), stage.height());
+            pdf.save('composite-image.pdf');
+            setShowExportDialog(false);
+            return;
+          } catch (error) {
+            console.error('PDF generation error:', error);
+            toast.error('Failed to generate PDF. Please try another format.');
+            return;
+          }
+
+        case 'jpg':
+        case 'jpeg':
+          dataURL = stage.toDataURL({
+            mimeType: 'image/jpeg',
+            quality: exportSettings.quality,
+            pixelRatio: 3
+          });
+          break;
+
+        case 'webp':
+          dataURL = stage.toDataURL({
+            mimeType: 'image/webp',
+            quality: exportSettings.quality,
+            pixelRatio: 3
+          });
+          break;
+
+        default: // png
+          dataURL = stage.toDataURL({
+            pixelRatio: 3
+          });
+      }
+
+      // Handle download for non-PDF formats
       const link = document.createElement('a');
       link.download = `composite-image.${exportSettings.fileType}`;
       link.href = dataURL;
@@ -1858,9 +1873,10 @@ export default function CompositeEditor() {
       link.click();
       document.body.removeChild(link);
       setShowExportDialog(false);
+
     } catch (error) {
       console.error('Export error:', error);
-      toast.error('Failed to export image. Please try again.');
+      toast.error('Failed to export image. Please try another format.');
     }
   };
 
@@ -2011,9 +2027,21 @@ export default function CompositeEditor() {
                             <SelectItem value="jpg">JPG (Smaller size)</SelectItem>
                             <SelectItem value="webp">WebP (Modern format)</SelectItem>
                             <SelectItem value="pdf">PDF (Document)</SelectItem>
+                            <SelectItem value="psd">PSD (Adobe Photoshop)</SelectItem>
+                            <SelectItem value="ai">AI (Adobe Illustrator)</SelectItem>
+                            <SelectItem value="eps">EPS (Vector format)</SelectItem>
+                            <SelectItem value="tiff">TIFF (Print quality)</SelectItem>
                           </SelectContent>
                         </Select>
+                        <span className="text-xs text-muted-foreground">
+                          {exportSettings.fileType === 'psd' && "Adobe Photoshop format with layers preserved"}
+                          {exportSettings.fileType === 'ai' && "Adobe Illustrator vector format"}
+                          {exportSettings.fileType === 'eps' && "Encapsulated PostScript for vector graphics"}
+                          {exportSettings.fileType === 'tiff' && "High-quality format for print"}
+                        </span>
                       </div>
+
+                      {/* Show quality slider only for formats that support it */}
                       {(exportSettings.fileType === 'jpg' || exportSettings.fileType === 'webp') && (
                         <div className="grid gap-2">
                           <label>Quality</label>
@@ -2027,6 +2055,22 @@ export default function CompositeEditor() {
                           <span className="text-sm text-muted-foreground">{Math.round(exportSettings.quality * 100)}%</span>
                         </div>
                       )}
+
+                      {/* Add warning for Adobe formats */}
+                      {(['psd', 'ai', 'eps'].includes(exportSettings.fileType)) && (
+                        <div className="bg-yellow-500/15 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-sm p-3 rounded-md">
+                          {exportSettings.fileType === 'psd' && 
+                            "Note: Will export as PNG with .psd extension. Open in Photoshop for further editing."
+                          }
+                          {exportSettings.fileType === 'ai' && 
+                            "Note: Will export as SVG with .ai extension. Open in Illustrator for vector editing."
+                          }
+                          {exportSettings.fileType === 'eps' && 
+                            "Note: Will export as SVG with .eps extension. Compatible with vector editing software."
+                          }
+                        </div>
+                      )}
+
                       <div className="flex justify-end gap-3">
                         <Button variant="outline" onClick={() => setShowExportDialog(false)}>
                           Cancel

@@ -1,0 +1,62 @@
+Frontend: will be using React. Shadcn UI + Tailwind CSS. 
+Always check @codebase . check @codebase for confilicting/repeating code
+Dont create any folder in the root directory
+
+apply DRY method.
+Make the code more manageble like make it more modular as possible.
+user proper syntac for shadcn commands(use latest)
+
+`DO NOT GIVE ME HIGH LEVEL SHIT, IF I ASK FOR FIX OR EXPLANATION, I WANT ACTUAL CODE OR EXPLANATION!!! I DON'T WANT "Here's how you can blablabla"
+
+- Be casual unless otherwise specified
+- Be terse
+- Suggest solutions that I didn't think about—anticipate my needs
+- Treat me as an expert
+- Be accurate and thorough
+- Give the answer immediately. Provide detailed explanations and restate my query in your own words if necessary after giving the answer
+- Value good arguments over authorities, the source is irrelevant
+- Consider new technologies and contrarian ideas, not just the conventional wisdom
+- You may use high levels of speculation or prediction, just flag it for me
+- No moral lectures
+- Discuss safety only when it's crucial and non-obvious
+- If your content policy is an issue, provide the closest acceptable response and explain the content policy issue afterward
+- Cite sources whenever possible at the end, not inline
+- No need to mention your knowledge cutoff
+- No need to disclose you're an AI
+- Please respect my prettier preferences when you provide code.
+- Split into multiple responses if one response isn't enough to answer the question.
+
+If I ask for adjustments to code I have provided you, do not repeat all of my code unnecessarily. Instead try to keep the answer brief by giving just a couple lines before/after any changes you make. Multiple code blocks are ok.`
+
+
+App context:
+Name: FACERENDER
+Solution: Centralized Web-Based Facial Composite System
+The proposed solution is a Centralized Facial Composite Generation System designed as a web-based application to address the current limitations in facial composite creation. This system will incorporate a unified, cloud-based infrastructure with machine learning and AI technology, enabling streamlined access to tools, real-time data sharing, and automated adjustments to facial features. Below is a detailed breakdown of the system features, organized into main features that address existing problems, followed by additional features that enhance functionality.
+Core Features of the Centralized Facial Composite System
+1. Main Features
+1.	Integrated Database of Facial Features
+o	Centralized Facial Components Database: A comprehensive, centralized database of facial features (eyes, nose, mouth, skin tones, etc.) accessible within the software interface, eliminating the need to navigate separate folders. This database includes subcategories for primary attributes, accessories, and race-based templates for streamlined selection.
+o	Composite Database Extension: In addition to storing individual facial features, a database will be added for finalized composite images. Each composite will include essential details, such as offense, name, sex, age, height, weight, build, complexion, the examiner, and the investigator-on-case.
+2.	Automated Facial Feature Alignment and Adjustment
+o	Automatic Layering and Proportion Matching: AI-powered algorithms automatically layer and align facial features according to default human facial proportions. This reduces the need for extensive manual adjustments, allowing artists to focus on fine-tuning the composite.
+o	Intelligent Blending and Color Matching: AI-driven blending tools harmonize skin tones, shadows, and colors across different facial features, ensuring a natural look while minimizing manual blending time.
+3.	Customizable Facial Feature Selection
+o	Facial Feature Templates: Pre-configured templates for various demographics, including age, ethnicity, and gender, allow artists to start with a base template, which they can customize to fit witness descriptions.
+o	Dynamic Search and Filter Options: A powerful, built-in search and filter system enables artists to quickly locate specific facial features based on descriptive tags (e.g., round eyes, broad nose), enhancing the efficiency of selecting and applying features.
+4.	Enhanced Data Security and Access Control
+o	Secure Login and Permission-Based Access: A secure login system ensures that only authorized users can access the system, with permission-based access to control who can view, edit, or distribute files within the database.
+o	Automated Backup and Data Integrity: Automatic backups and routine integrity checks maintain data security, with backup copies stored off-site to prevent data loss.
+2. Additional Features
+1.	Customizable Wanted Bulletin Creation Tool
+o	Built-in Bulletin Template Library: The system will include customizable templates for creating wanted bulletins, allowing case-specific details such as the suspect’s facial composite, personal descriptors (height, age, weight), and case information to be added easily.
+o	Drag-and-Drop Functionality for Easy Design: Artists can drag and drop the completed composite and other relevant fields (e.g., name, offense, location) into pre-set bulletin sections, making it possible to generate a complete wanted bulletin within minutes.
+o	Automatic Export in Print-Ready and Digital Formats: Bulletins can be directly exported in print-ready formats (PDF or PNG) or in digital formats for easy sharing with law enforcement agencies.
+2.	Automated Facial Composite Workflow and Documentation
+o	Step-by-Step Workflow Documentation: Each step of the composite creation process is automatically logged, enabling easy review and progress tracking, as well as providing an audit trail for validation and accountability.
+o	Automated Report Generation: The system generates a final report that includes essential details (e.g., composite artist, witness input, modification history, and case identifiers), formatted for sharing and saving as part of the case file.
+3.	Real-Time Composite Comparison
+o	Composite Comparison Overlay: This feature allows artists to overlay or compare new composites with previous versions or similar records, ensuring visual quality control and consistency across multiple images.
+4.	Search Functionality
+o	Enhanced Search for Composite Retrieval: A search function allows users to retrieve previously created composites based on descriptors like name, offense, or demographic details, facilitating quick access to historical data for reference and consistency.
+By integrating these features into a web-based system, the RFU will benefit from a streamlined, accessible, and secure solution that enhances the accuracy, efficiency, and reliability of facial composite creation. This centralized system will reduce time spent on manual tasks, improve composite quality, and support consistent operational standards.

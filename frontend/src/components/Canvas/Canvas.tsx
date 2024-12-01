@@ -1,5 +1,5 @@
-import { Stage, Layer, Image } from 'react-konva'
-import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
+import { Stage, Layer, Image, Line, Rect, Transformer } from 'react-konva'
+import { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react'
 import { KonvaEventObject } from 'konva/lib/Node'
 import Konva from 'konva'
 import { debounce } from 'lodash';
@@ -16,6 +16,9 @@ interface CanvasProps {
   initialFeatures: Feature[]
   disableDragging?: boolean
   stageRef?: React.RefObject<Konva.Stage>
+  brushSettings?: BrushSettings;
+  isBrushActive?: boolean;
+  selectedFeatureForBrush?: string;
 }
 
 interface CanvasRef {
@@ -39,6 +42,20 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
   const stageRef = externalStageRef || internalStageRef
   const layerRef = useRef<Konva.Layer>(null)
   const imagesRef = useRef<Map<string, Konva.Image>>(new Map())
+  const [lines, setLines] = useState<Array<{
+    points: number[];
+    size: number;
+    opacity: number;
+    feature: string;
+  }>>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [selectedFeatureBounds, setSelectedFeatureBounds] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const transformerRef = useRef<Konva.Transformer>(null);
 
   const applySkinToneFilter = async (value: number, skinAnalysis?: SkinAnalysisResult) => {
     console.log('applySkinToneFilter called:', { value, skinAnalysis });
@@ -328,6 +345,42 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
     });
   }, 16);
 
+  const handleMouseDown = (e: KonvaEventObject<MouseEvent>) => {
+    if (!props.isBrushActive) return;
+    
+    setIsDrawing(true);
+    const pos = e.target.getStage()?.getPointerPosition();
+    if (!pos) return;
+
+    setLines([...lines, {
+      points: [pos.x, pos.y],
+      size: props.brushSettings?.size || 5,
+      opacity: props.brushSettings?.opacity || 1,
+      feature: props.selectedFeatureForBrush || 'wholeFace'
+    }]);
+  };
+
+  const handleMouseMove = (e: KonvaEventObject<MouseEvent>) => {
+    if (!isDrawing || !props.isBrushActive) return;
+
+    const pos = e.target.getStage()?.getPointerPosition();
+    if (!pos) return;
+
+    const lastLine = lines[lines.length - 1];
+    if (!lastLine) return;
+
+    const newLine = {
+      ...lastLine,
+      points: [...lastLine.points, pos.x, pos.y]
+    };
+
+    setLines([...lines.slice(0, -1), newLine]);
+  };
+
+  const handleMouseUp = () => {
+    setIsDrawing(false);
+  };
+
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     addFeature: (feature: any) => {
@@ -503,17 +556,77 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
     layerRef.current.batchDraw()
   }, [layers, zoom, width, height])
 
+  useEffect(() => {
+    return () => {
+      setLines([]);
+      setIsDrawing(false);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!props.selectedFeatureForBrush || !props.isBrushActive) {
+      setSelectedFeatureBounds(null);
+      return;
+    }
+
+    const selectedImage = Array.from(imagesRef.current.entries()).find(
+      ([_, image]) => image.id().toLowerCase().includes(props.selectedFeatureForBrush.toLowerCase())
+    );
+
+    if (selectedImage) {
+      const [_, image] = selectedImage;
+      const box = image.getClientRect();
+      setSelectedFeatureBounds(box);
+    }
+  }, [props.selectedFeatureForBrush, props.isBrushActive]);
+
   return (
-    <Stage
-      ref={stageRef}
-      width={width}
-      height={height}
-      draggable={false}
-      imageSmoothingEnabled={true}
-      crossOrigin="anonymous"
-    >
-      <Layer ref={layerRef} listening={false} />
-    </Stage>
+    <div style={{ 
+      cursor: props.isBrushActive ? 'url("/eraser-cursor.png") 8 8, auto' : 'default'
+    }}>
+      <Stage
+        ref={stageRef}
+        width={width}
+        height={height}
+        draggable={false}
+        imageSmoothingEnabled={true}
+        crossOrigin="anonymous"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        <Layer ref={layerRef} listening={false} />
+        <Layer>
+          {lines.map((line, i) => (
+            <Line
+              key={i}
+              points={line.points}
+              stroke="#000000"
+              strokeWidth={line.size}
+              tension={0.5}
+              lineCap="round"
+              lineJoin="round"
+              globalCompositeOperation="destination-out"
+              opacity={line.opacity}
+              listening={false}
+            />
+          ))}
+          {selectedFeatureBounds && (
+            <Rect
+              x={selectedFeatureBounds.x}
+              y={selectedFeatureBounds.y}
+              width={selectedFeatureBounds.width}
+              height={selectedFeatureBounds.height}
+              stroke="#00ff00"
+              strokeWidth={2}
+              dash={[5, 5]}
+              listening={false}
+            />
+          )}
+        </Layer>
+      </Stage>
+    </div>
   )
 })
 

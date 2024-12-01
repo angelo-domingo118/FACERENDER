@@ -20,7 +20,7 @@ import {
   CircleDot, SmilePlus, HeadphonesIcon, Minus, CircleUser,
   ZoomOut, ZoomIn,
   Printer,
-  Brush,
+  Brush, Eraser,
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { Slider } from "@/components/ui/slider"
@@ -52,7 +52,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import jsPDF from 'jspdf';
-import { Stage } from 'konva';
+import { Stage, Layer, Line } from 'react-konva'
 import { NewCompositeDialog } from "@/components/dialogs/NewCompositeDialog"
 import Konva from 'konva';
 
@@ -150,6 +150,13 @@ interface PreviewDialogProps {
 interface ExportSettings {
   fileType: string;
   quality: number;
+}
+
+// Add new brush-related interfaces
+interface BrushSettings {
+  size: number;
+  mode: 'erase';  // Remove 'draw' option
+  opacity: number;
 }
 
 export default function CompositeEditor() {
@@ -441,6 +448,80 @@ export default function CompositeEditor() {
                   </div>
                 </>
               )}
+            </div>
+          </ScrollArea>
+        </div>
+      );
+    }
+
+    if (activeTool === "Brush Tool") {
+      return (
+        <div className="w-[320px] border-l flex flex-col bg-background">
+          <div className="p-4 border-b">
+            <h2 className="font-medium">Eraser Tool</h2>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-6">
+              {/* Feature Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Feature to Erase</label>
+                <Select
+                  value={selectedFeatureForBrush}
+                  onValueChange={(value) => {
+                    setSelectedFeatureForBrush(value);
+                    setIsBrushActive(true);
+                  }}
+                >
+                  <SelectTrigger className={selectedFeatureForBrush ? "border-primary" : ""}>
+                    <SelectValue placeholder="Select feature" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="wholeFace">Whole Face</SelectItem>
+                    <SelectItem value="eyes">Eyes</SelectItem>
+                    <SelectItem value="nose">Nose</SelectItem>
+                    <SelectItem value="mouth">Mouth</SelectItem>
+                    <SelectItem value="eyebrows">Eyebrows</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Eraser Size with visual indicator */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium">Eraser Size</label>
+                  <div 
+                    className="w-8 h-8 rounded-full border border-input"
+                    style={{
+                      width: `${brushSettings.size}px`,
+                      height: `${brushSettings.size}px`,
+                      backgroundColor: 'rgba(0,0,0,0.1)',
+                    }}
+                  />
+                </div>
+                <Slider
+                  value={[brushSettings.size]}
+                  min={1}
+                  max={50}
+                  step={1}
+                  onValueChange={([value]) => setBrushSettings(prev => ({ ...prev, size: value }))}
+                  className="cursor-pointer"
+                />
+              </div>
+
+              {/* Opacity */}
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <label className="text-sm font-medium">Opacity</label>
+                  <span className="text-sm text-muted-foreground">{Math.round(brushSettings.opacity * 100)}%</span>
+                </div>
+                <Slider
+                  value={[brushSettings.opacity * 100]}
+                  min={1}
+                  max={100}
+                  step={1}
+                  onValueChange={([value]) => setBrushSettings(prev => ({ ...prev, opacity: value / 100 }))}
+                />
+              </div>
             </div>
           </ScrollArea>
         </div>
@@ -1114,12 +1195,12 @@ export default function CompositeEditor() {
                 {/* Feature Categories */}
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: 'faceShape', label: 'Face', icon: <CircleUser className="h-4 w-4" /> },
+                    { value: 'faceShape', label: 'Face Shape', icon: <CircleUser className="h-4 w-4" /> },
                     { value: 'eyes', label: 'Eyes', icon: <Eye className="h-4 w-4" /> },
+                    { value: 'eyebrows', label: 'Eyebrows', icon: <Minus className="h-4 w-4" /> },
                     { value: 'nose', label: 'Nose', icon: <CircleDot className="h-4 w-4" /> },
                     { value: 'mouth', label: 'Mouth', icon: <SmilePlus className="h-4 w-4" /> },
-                    { value: 'ears', label: 'Ears', icon: <HeadphonesIcon className="h-4 w-4" /> },
-                    { value: 'eyebrows', label: 'Brows', icon: <Minus className="h-4 w-4" /> }
+                    { value: 'ears', label: 'Ears', icon: <HeadphonesIcon className="h-4 w-4" /> }
                   ].map((category) => (
                     <Button
                       key={category.value}
@@ -1666,20 +1747,23 @@ export default function CompositeEditor() {
   const [gridZoom, setGridZoom] = useState(150);
   const [currentFeature, setCurrentFeature] = useState<string>('faceShape');
 
-  // Add this function to handle feature selection
+  // Add these refs after other state declarations
+  const imagesRef = useRef(new Map());
+  const layerRef = useRef<Konva.Layer | null>(null);
+
+  // Update handleFeatureSelect function
   const handleFeatureSelect = async (feature: FeatureItem) => {
     try {
+      console.log('Selecting feature:', feature);
       setSelectedFeatureId(feature.id);
+
+      // Get existing modifications for the feature if any
+      const existingMods = featureModifications[selectedFeature] || {};
 
       // Update layers while preserving modifications
       setLayers(prev => {
         return prev.map(layer => {
           if (layer.feature.category === selectedFeature) {
-            // Ensure image is loaded with CORS
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.src = feature.url;
-            
             return {
               ...layer,
               id: feature.id,
@@ -1697,29 +1781,36 @@ export default function CompositeEditor() {
         });
       });
 
-      // Update canvas with new feature while preserving modifications
+      // Update canvas with new feature
       if (canvasRef.current) {
         const imageNode = imagesRef.current.get(selectedFeature);
         if (imageNode) {
           const img = new Image();
+          img.crossOrigin = 'anonymous';
           img.src = feature.url;
           img.onload = () => {
             imageNode.image(img);
             
-            // Reapply modifications after loading new image
-            const mods = featureModifications[selectedFeature];
-            if (mods) {
-              Object.entries(mods).forEach(([key, value]) => {
+            // Reapply modifications if they exist
+            if (existingMods) {
+              Object.entries(existingMods).forEach(([key, value]) => {
                 imageNode[key](value);
               });
             }
             
-            layerRef.current?.batchDraw();
+            if (layerRef.current) {
+              layerRef.current.batchDraw();
+            }
           };
         }
       }
     } catch (error) {
       console.error('Error selecting feature:', error);
+      toast({
+        title: "Error",
+        description: "Failed to select feature",
+        variant: "destructive"
+      });
     }
   };
 
@@ -2114,6 +2205,34 @@ export default function CompositeEditor() {
     }
   };
 
+  // Add to existing state declarations
+  const [isBrushActive, setIsBrushActive] = useState(false);
+  const [brushSettings, setBrushSettings] = useState<BrushSettings>({
+    size: 5,
+    mode: 'erase',
+    opacity: 1,
+  });
+  const [selectedFeatureForBrush, setSelectedFeatureForBrush] = useState<string>('wholeFace');
+  const [lines, setLines] = useState<any[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  // Add to state declarations
+  const [eraserCursor, setEraserCursor] = useState<string>('');
+
+  // Add useEffect to load eraser cursor
+  useEffect(() => {
+    // Create eraser cursor SVG
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+        <circle cx="16" cy="16" r="${brushSettings.size}" fill="rgba(255,255,255,0.5)" stroke="black"/>
+      </svg>
+    `;
+    
+    // Convert SVG to data URL
+    const dataUrl = `data:image/svg+xml;base64,${btoa(svg)}`;
+    setEraserCursor(dataUrl);
+  }, [brushSettings.size]);
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen bg-background">
@@ -2359,6 +2478,7 @@ export default function CompositeEditor() {
                   { icon: <Move className="h-5 w-5" />, label: "Feature Adjustment" },
                   { icon: <ImageIcon className="h-5 w-5" />, label: "Feature Selection" },
                   { icon: <Sliders className="h-5 w-5" />, label: "Attributes" },
+                  { icon: <Brush className="h-5 w-5" />, label: "Brush Tool" },
                   { icon: <Brush className="h-5 w-5" />, label: "Artistic Effects" }
                 ].map((tool) => (
                   <Button 
@@ -2444,6 +2564,10 @@ export default function CompositeEditor() {
                       initialZoom={zoom}
                       initialFeatures={initialFeatures}
                       disableDragging={true}
+                      brushSettings={brushSettings}
+                      isBrushActive={isBrushActive}
+                      selectedFeatureForBrush={selectedFeatureForBrush}
+                      eraserCursor={eraserCursor}
                     />
                   </div>
                 </div>

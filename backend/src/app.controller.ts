@@ -1,39 +1,30 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { Controller, Get, Post } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
 
 @Controller()
 export class AppController {
   constructor(
-    private readonly appService: AppService,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
-  @Get()
-  getHello() {
-    return { message: 'NestJS Backend is running!' };
+  @Post('test-db')
+  async testDB() {
+    const user = this.userRepository.create({
+      username: 'testuser',
+      password: 'password123',
+      email: 'test@example.com',
+      role: 'user'
+    });
+    
+    await this.userRepository.save(user);
+    return { message: 'Test user created successfully' };
   }
 
-  @Get('/api/test')
-  getTest() {
-    return { message: 'Backend is connected!' };
-  }
-
-  @Get('/api/features')
-  getFeatures() {
-    return {
-      features: [
-        {
-          title: "AI-Powered Alignment",
-          description: "Automatic feature alignment and proportion matching"
-        },
-        {
-          title: "Real-time Collaboration",
-          description: "Work together in real-time"
-        },
-        {
-          title: "Secure Database",
-          description: "Centralized, secure storage"
-        }
-      ]
-    };
+  @Get('users')
+  async getUsers() {
+    return await this.userRepository.find();
   }
 }

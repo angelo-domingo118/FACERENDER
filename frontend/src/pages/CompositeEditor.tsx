@@ -99,6 +99,13 @@ interface CanvasRef {
 interface CompositeState {
   features: Feature[]
   zoom: number
+  layers: Layer[]
+  attributes: {
+    skinTone: number
+    contrast: number
+    sharpness: number
+  }
+  selectedFeatureId: string | null
 }
 
 interface Layer {
@@ -150,13 +157,6 @@ interface PreviewDialogProps {
 interface ExportSettings {
   fileType: string;
   quality: number;
-}
-
-// Add new brush-related interfaces
-interface BrushSettings {
-  size: number;
-  mode: 'erase';  // Remove 'draw' option
-  opacity: number;
 }
 
 export default function CompositeEditor() {
@@ -448,80 +448,6 @@ export default function CompositeEditor() {
                   </div>
                 </>
               )}
-            </div>
-          </ScrollArea>
-        </div>
-      );
-    }
-
-    if (activeTool === "Brush Tool") {
-      return (
-        <div className="w-[320px] border-l flex flex-col bg-background">
-          <div className="p-4 border-b">
-            <h2 className="font-medium">Eraser Tool</h2>
-          </div>
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-6">
-              {/* Feature Selection */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Select Feature to Erase</label>
-                <Select
-                  value={selectedFeatureForBrush}
-                  onValueChange={(value) => {
-                    setSelectedFeatureForBrush(value);
-                    setIsBrushActive(true);
-                  }}
-                >
-                  <SelectTrigger className={selectedFeatureForBrush ? "border-primary" : ""}>
-                    <SelectValue placeholder="Select feature" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="wholeFace">Whole Face</SelectItem>
-                    <SelectItem value="eyes">Eyes</SelectItem>
-                    <SelectItem value="nose">Nose</SelectItem>
-                    <SelectItem value="mouth">Mouth</SelectItem>
-                    <SelectItem value="eyebrows">Eyebrows</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Eraser Size with visual indicator */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium">Eraser Size</label>
-                  <div 
-                    className="w-8 h-8 rounded-full border border-input"
-                    style={{
-                      width: `${brushSettings.size}px`,
-                      height: `${brushSettings.size}px`,
-                      backgroundColor: 'rgba(0,0,0,0.1)',
-                    }}
-                  />
-                </div>
-                <Slider
-                  value={[brushSettings.size]}
-                  min={1}
-                  max={50}
-                  step={1}
-                  onValueChange={([value]) => setBrushSettings(prev => ({ ...prev, size: value }))}
-                  className="cursor-pointer"
-                />
-              </div>
-
-              {/* Opacity */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label className="text-sm font-medium">Opacity</label>
-                  <span className="text-sm text-muted-foreground">{Math.round(brushSettings.opacity * 100)}%</span>
-                </div>
-                <Slider
-                  value={[brushSettings.opacity * 100]}
-                  min={1}
-                  max={100}
-                  step={1}
-                  onValueChange={([value]) => setBrushSettings(prev => ({ ...prev, opacity: value / 100 }))}
-                />
-              </div>
             </div>
           </ScrollArea>
         </div>
@@ -2205,33 +2131,89 @@ export default function CompositeEditor() {
     }
   };
 
-  // Add to existing state declarations
-  const [isBrushActive, setIsBrushActive] = useState(false);
-  const [brushSettings, setBrushSettings] = useState<BrushSettings>({
-    size: 5,
-    mode: 'erase',
-    opacity: 1,
-  });
-  const [selectedFeatureForBrush, setSelectedFeatureForBrush] = useState<string>('wholeFace');
-  const [lines, setLines] = useState<any[]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
+  // Add history state management
+  const [history, setHistory] = useState<CompositeState[]>([])
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1)
+  const [isUndoRedoAction, setIsUndoRedoAction] = useState(false)
 
-  // Add to state declarations
-  const [eraserCursor, setEraserCursor] = useState<string>('');
+  // Function to save state to history
+  const saveToHistory = () => {
+    if (isUndoRedoAction) {
+      setIsUndoRedoAction(false)
+      return
+    }
 
-  // Add useEffect to load eraser cursor
+    const currentState: CompositeState = {
+      features,
+      zoom,
+      layers,
+      attributes,
+      selectedFeatureId
+    }
+
+    // Remove any future states if we're not at the end of history
+    const newHistory = history.slice(0, currentHistoryIndex + 1)
+    setHistory([...newHistory, currentState])
+    setCurrentHistoryIndex(currentHistoryIndex + 1)
+  }
+
+  // Undo handler
+  const handleUndo = () => {
+    if (currentHistoryIndex > 0) {
+      setIsUndoRedoAction(true)
+      const previousState = history[currentHistoryIndex - 1]
+      
+      // Restore previous state
+      setFeatures(previousState.features)
+      setZoom(previousState.zoom)
+      setLayers(previousState.layers)
+      setAttributes(previousState.attributes)
+      setSelectedFeatureId(previousState.selectedFeatureId)
+      
+      setCurrentHistoryIndex(currentHistoryIndex - 1)
+    }
+  }
+
+  // Redo handler
+  const handleRedo = () => {
+    if (currentHistoryIndex < history.length - 1) {
+      setIsUndoRedoAction(true)
+      const nextState = history[currentHistoryIndex + 1]
+      
+      // Restore next state
+      setFeatures(nextState.features)
+      setZoom(nextState.zoom)
+      setLayers(nextState.layers)
+      setAttributes(nextState.attributes)
+      setSelectedFeatureId(nextState.selectedFeatureId)
+      
+      setCurrentHistoryIndex(currentHistoryIndex + 1)
+    }
+  }
+
+  // Add effect to initialize history
   useEffect(() => {
-    // Create eraser cursor SVG
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-        <circle cx="16" cy="16" r="${brushSettings.size}" fill="rgba(255,255,255,0.5)" stroke="black"/>
-      </svg>
-    `;
-    
-    // Convert SVG to data URL
-    const dataUrl = `data:image/svg+xml;base64,${btoa(svg)}`;
-    setEraserCursor(dataUrl);
-  }, [brushSettings.size]);
+    const initialState: CompositeState = {
+      features: [],
+      zoom: 190,
+      layers: [],
+      attributes: {
+        skinTone: 50,
+        contrast: 50,
+        sharpness: 50
+      },
+      selectedFeatureId: null
+    }
+    setHistory([initialState])
+    setCurrentHistoryIndex(0)
+  }, [])
+
+  // Add effect to save state changes to history
+  useEffect(() => {
+    if (!isUndoRedoAction) {
+      saveToHistory()
+    }
+  }, [features, layers, attributes]) // Add other dependencies that should trigger history saves
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -2441,6 +2423,8 @@ export default function CompositeEditor() {
                       isCollapsed ? "h-8 w-8" : "h-10 w-10"
                     )}
                     title="Undo"
+                    onClick={handleUndo}
+                    disabled={currentHistoryIndex <= 0}
                   >
                     <Undo className={cn(
                       isCollapsed ? "h-4 w-4" : "h-5 w-5"
@@ -2457,6 +2441,8 @@ export default function CompositeEditor() {
                       isCollapsed ? "h-8 w-8" : "h-10 w-10"
                     )}
                     title="Redo"
+                    onClick={handleRedo}
+                    disabled={currentHistoryIndex >= history.length - 1}
                   >
                     <Redo className={cn(
                       isCollapsed ? "h-4 w-4" : "h-5 w-5"
@@ -2478,7 +2464,6 @@ export default function CompositeEditor() {
                   { icon: <Move className="h-5 w-5" />, label: "Feature Adjustment" },
                   { icon: <ImageIcon className="h-5 w-5" />, label: "Feature Selection" },
                   { icon: <Sliders className="h-5 w-5" />, label: "Attributes" },
-                  { icon: <Brush className="h-5 w-5" />, label: "Brush Tool" },
                   { icon: <Brush className="h-5 w-5" />, label: "Artistic Effects" }
                 ].map((tool) => (
                   <Button 
@@ -2564,10 +2549,6 @@ export default function CompositeEditor() {
                       initialZoom={zoom}
                       initialFeatures={initialFeatures}
                       disableDragging={true}
-                      brushSettings={brushSettings}
-                      isBrushActive={isBrushActive}
-                      selectedFeatureForBrush={selectedFeatureForBrush}
-                      eraserCursor={eraserCursor}
                     />
                   </div>
                 </div>

@@ -2,44 +2,569 @@ import { useEffect, useState } from 'react';
 import { useApi } from '@/hooks/useApi';
 import { ModeToggle } from "@/components/mode-toggle"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Shield, Zap, CheckCircle, Menu, Github, Brain, Mail, Phone, MapPin, Twitter, Linkedin } from "lucide-react"
+import { ArrowRight, Brain, Mail, Phone, MapPin, Image as ImageIcon, ChevronDown, Shield, Lock, FileCheck, Database, Users, Clock, Fingerprint, ScrollText, LayoutDashboard, Search, FileText, AlertCircle, PhoneCall, GraduationCap, Headset } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import axios from 'axios';
+import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
+import { Card, CardContent } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
+import { CircularProgress } from "@/components/ui/circular-progress"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { HelpCircle, TrendingUp, TrendingDown } from "lucide-react"
+import { LucideIcon } from 'lucide-react'
+
+// Add placeholder component
+const ImagePlaceholder = ({ className }: { className?: string }) => (
+  <div className={cn(
+    "flex items-center justify-center bg-muted/50 rounded-lg animate-pulse",
+    className
+  )}>
+    <ImageIcon className="h-10 w-10 text-muted-foreground/50" />
+  </div>
+)
+
+// Add this component at the top
+const ScrollIndicator = () => (
+  <motion.div 
+    className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 cursor-pointer"
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    transition={{ delay: 1 }}
+    onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+  >
+    <span className="text-sm text-muted-foreground">Scroll for more</span>
+    <motion.div
+      animate={{ y: [0, 8, 0] }}
+      transition={{ duration: 1.5, repeat: Infinity }}
+    >
+      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+    </motion.div>
+  </motion.div>
+)
+
+// Add this for mouse follow effect
+const MouseFollowGradient = () => {
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({
+        x: (e.clientX / window.innerWidth) * 100,
+        y: (e.clientY / window.innerHeight) * 100,
+      })
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
+
+  return (
+    <div 
+      className="fixed inset-0 pointer-events-none"
+      style={{
+        background: `radial-gradient(circle at ${mousePosition.x}% ${mousePosition.y}%, rgba(var(--primary-rgb), 0.1) 0%, transparent 50%)`
+      }}
+    />
+  )
+}
+
+// Add interface for FeatureCard props
+interface FeatureCardProps {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}
+
+// Update FeatureCard with proper typing
+const FeatureCard = ({ icon: Icon, title, description }: FeatureCardProps) => {
+  const [isHovered, setIsHovered] = useState(false)
+
+  return (
+    <motion.div
+      whileHover={{ 
+        scale: 1.05,
+        rotateX: 10,
+        rotateY: 10,
+        perspective: 1000
+      }}
+      transition={{ 
+        type: "spring",
+        stiffness: 300,
+        damping: 20
+      }}
+    >
+      <Card className="h-full relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <CardContent className="p-4 flex flex-col min-h-[160px] relative z-10">
+          <motion.div
+            animate={{
+              y: isHovered ? [-5, 5] : 0
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              repeatType: "reverse"
+            }}
+            className="rounded-full p-2 bg-primary/10 shrink-0 w-fit"
+            onHoverStart={() => setIsHovered(true)}
+            onHoverEnd={() => setIsHovered(false)}
+          >
+            <Icon className="h-5 w-5 text-primary" />
+          </motion.div>
+          <div className="space-y-1.5 mt-3">
+            <h3 className="font-semibold">{title}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
+
+// Add this type for better type safety
+interface QuickAccessItem {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  path: string;
+  color: string;
+}
+
+// Updated QuickAccessCard with better UX
+const QuickAccessCard = ({ item, onClick }: { item: QuickAccessItem; onClick: (path: string) => void }) => {
+  const [isFlipped, setIsFlipped] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleAction = async (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card flip when clicking button
+    setIsLoading(true)
+    try {
+      await onClick(item.path)
+    } catch (error) {
+      console.error('Navigation error:', error)
+      // You might want to add toast notification here
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div 
+      className="relative h-[220px] group cursor-pointer" 
+      onClick={() => setIsFlipped(!isFlipped)}
+      role="button"
+      tabIndex={0}
+      aria-label={`${item.title} quick access card. Click to flip for more information`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          setIsFlipped(!isFlipped)
+        }
+      }}
+    >
+      {/* Flip indicator */}
+      <div className="absolute -top-2 -right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Badge variant="secondary" className="shadow-sm">
+          <ArrowRight className="h-3 w-3 mr-1" />
+          Click to flip
+        </Badge>
+      </div>
+
+      <motion.div
+        initial={false}
+        animate={{ 
+          rotateY: isFlipped ? 180 : 0,
+          opacity: isFlipped ? 0 : 1
+        }}
+        transition={{ duration: 0.6 }}
+        style={{ 
+          transformStyle: "preserve-3d",
+          backfaceVisibility: "hidden"
+        }}
+        className="absolute inset-0"
+      >
+        {/* Front of card */}
+        <Card className="h-full hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary/20">
+          <CardContent className="p-6 flex flex-col items-center justify-center h-full">
+            <div className={cn(
+              "p-3 rounded-lg transition-colors mb-4",
+              item.color
+            )}>
+              <item.icon className="h-8 w-8 text-foreground" />
+            </div>
+            <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+            <p className="text-sm text-muted-foreground text-center">
+              Click to learn more
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={false}
+        animate={{ 
+          rotateY: isFlipped ? 0 : -180,
+          opacity: isFlipped ? 1 : 0
+        }}
+        transition={{ duration: 0.6 }}
+        style={{ 
+          transformStyle: "preserve-3d",
+          backfaceVisibility: "hidden"
+        }}
+        className="absolute inset-0"
+      >
+        {/* Back of card */}
+        <Card className="h-full hover:shadow-xl transition-all duration-300 border-2 border-primary/20">
+          <CardContent className="p-6 flex flex-col items-center justify-between h-full">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-4">{item.description}</p>
+            </div>
+            <div className="flex flex-col gap-2 w-full">
+              <Button 
+                onClick={handleAction}
+                disabled={isLoading}
+                className="w-full"
+              >
+                {isLoading ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="mr-2"
+                    >
+                      <Clock className="h-4 w-4" />
+                    </motion.div>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    Access Now
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsFlipped(false)
+                }}
+                className="w-full"
+              >
+                Back to front
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
+  )
+}
+
+// Update feature data to include AI-specific features
+const features = [
+  {
+    icon: Brain,
+    title: "AI-Powered Positioning",
+    description: "Automatic facial feature placement using advanced AI algorithms for anatomically accurate composites"
+  },
+  {
+    icon: Database,
+    title: "Smart Feature Library",
+    description: "Region-specific facial feature database with AI-assisted search and filtering capabilities"
+  },
+  {
+    icon: FileCheck,
+    title: "Intelligent Adjustments",
+    description: "AI-guided feature scaling and positioning with real-time anatomical validation"
+  },
+  {
+    icon: Users,
+    title: "Collaborative Workflow",
+    description: "Multi-user case management with real-time updates and version control"
+  },
+  {
+    icon: LayoutDashboard,
+    title: "Template System",
+    description: "Pre-configured templates for various demographics including age, ethnicity, and gender specifications"
+  },
+  {
+    icon: Lock,
+    title: "Case Management",
+    description: "Comprehensive tracking of composites with case details, examiner info, and investigation records"
+  }
+]
+
+// Add this component for section headers
+const SectionHeader = ({ 
+  badge, 
+  title, 
+  description 
+}: { 
+  badge: string, 
+  title: string, 
+  description: string 
+}) => (
+  <motion.div 
+    className="text-center mb-16"
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true }}
+    transition={{ duration: 0.5 }}
+  >
+    <Badge variant="outline" className="mb-4">{badge}</Badge>
+    <h2 className="text-3xl font-bold mb-4 tracking-tight">{title}</h2>
+    <p className="text-muted-foreground max-w-2xl mx-auto">{description}</p>
+  </motion.div>
+)
+
+// Update quick access items to be more RFU-specific
+const quickAccess = [
+  {
+    icon: ScrollText,
+    title: "Create Composite",
+    description: "Generate new facial composite",
+    path: "/composite-builder",
+    badge: "Primary",
+    color: "bg-primary/10"
+  },
+  {
+    icon: Users,
+    title: "Witness Interview",
+    description: "Record witness descriptions",
+    path: "/interview",
+    badge: "Process",
+    color: "bg-orange-500/10" 
+  },
+  {
+    icon: FileText,
+    title: "Case Files",
+    description: "Access investigation records",
+    path: "/cases",
+    badge: "Records",
+    color: "bg-blue-500/10"
+  },
+  {
+    icon: Search,
+    title: "Search Database",
+    description: "Find existing composites",
+    path: "/search",
+    badge: "Search",
+    color: "bg-green-500/10"
+  }
+]
+
+// Update metric type definition to fix trend type issues
+type TrendType = 'up' | 'down' | 'neutral';
+
+interface SystemMetric {
+  label: string;
+  value: number;
+  percentage: number;
+  description: string;
+  trend: string;
+  trendType: TrendType;
+  info: string;
+}
+
+// Update the metrics array type
+const systemMetrics: SystemMetric[] = [
+  { 
+    label: "Active Cases", 
+    value: 24,
+    percentage: 85,
+    description: "Current open investigations",
+    trend: "+3 this week",
+    trendType: "up",
+    info: "Number of cases currently being processed by RFU-CAR"
+  },
+  { 
+    label: "Database Features", 
+    value: 2500,
+    percentage: 92,
+    description: "Facial components",
+    trend: "Updated weekly",
+    trendType: "neutral",
+    info: "Total number of facial features available in our database"
+  },
+  { 
+    label: "Case Resolution", 
+    value: 87,
+    percentage: 87,
+    description: "Successful identifications",
+    trend: "+2% vs last quarter",
+    trendType: "up",
+    info: "Percentage of cases where composites led to successful identifications"
+  },
+  { 
+    label: "Processing Time", 
+    value: 45,
+    percentage: 78,
+    description: "Average composite creation",
+    trend: "15min faster than manual",
+    trendType: "up",
+    info: "Average time taken to create a complete facial composite"
+  }
+]
+
+// Update security features with more details and icons
+const securityFeatures = [
+  {
+    title: "Evidence Grade Security",
+    description: "Compliant with PNP evidence handling protocols and digital forensics standards",
+    icon: Shield,
+    features: [
+      "End-to-end encryption",
+      "Secure data storage",
+      "Digital signatures",
+      "Audit trails"
+    ],
+    color: "bg-blue-500/10"
+  },
+  {
+    title: "Access Control",
+    description: "Role-based access for investigators, artists, and supervisors with granular permissions",
+    icon: Lock,
+    features: [
+      "Multi-factor authentication",
+      "Role-based permissions",
+      "Session management",
+      "Access logs"
+    ],
+    color: "bg-green-500/10"
+  },
+  {
+    title: "Audit System",
+    description: "Complete activity logs and case integrity tracking with tamper-proof records",
+    icon: FileCheck,
+    features: [
+      "Activity monitoring",
+      "Change tracking",
+      "Version control",
+      "Compliance reports"
+    ],
+    color: "bg-orange-500/10"
+  }
+]
+
+// Replace the existing FaceMeshLogo component with this
+const Logo = () => (
+  <div className="flex items-center gap-2">
+    <svg
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 24 24" 
+      fill="none"
+      stroke="currentColor" 
+      strokeWidth="2"
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      className="h-6 w-6"
+    >
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+      <path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08v0c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0l2.96 2.66" />
+      <path d="m18 15-2-2" />
+      <path d="m15 18-2-2" />
+    </svg>
+    <div className="flex flex-col">
+      <span className="text-xl font-bold tracking-tight">FACERENDER</span>
+      <span className="text-xs text-muted-foreground">RFU-CAR Composite System</span>
+    </div>
+  </div>
+)
+
+// Add this type for contact info
+interface ContactInfo {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  link?: string;
+  type: 'email' | 'phone' | 'address' | 'hours';
+}
+
+// Add contact information
+const contactInfo: ContactInfo[] = [
+  {
+    icon: Mail,
+    label: "Email Support",
+    value: "it.support@rfu-car.pnp.gov.ph",
+    link: "mailto:it.support@rfu-car.pnp.gov.ph",
+    type: 'email'
+  },
+  {
+    icon: Phone,
+    label: "Hotline",
+    value: "(074) 123-4567",
+    link: "tel:+63741234567",
+    type: 'phone'
+  },
+  {
+    icon: MapPin,
+    label: "Office Address",
+    value: "RFU-CAR Building, Camp Major Bado Dangwa, La Trinidad, Benguet",
+    link: "https://maps.google.com/?q=Camp+Major+Bado+Dangwa",
+    type: 'address'
+  },
+  {
+    icon: Clock,
+    label: "Operating Hours",
+    value: "Monday - Friday: 8:00 AM - 5:00 PM",
+    type: 'hours'
+  }
+]
+
+// Update the Quick Support section with RFU-specific actions
+const supportActions = [
+  { 
+    label: "Standard Procedures", 
+    icon: FileText,
+    description: "View SOP for composite creation",
+    link: "/docs/procedures"
+  },
+  { 
+    label: "Technical Manual", 
+    icon: GraduationCap,
+    description: "System usage guidelines",
+    link: "/docs/manual"
+  },
+  { 
+    label: "Report System Issue", 
+    icon: AlertCircle,
+    description: "Submit technical problems",
+    link: "/support/issue"
+  },
+  { 
+    label: "Request Training", 
+    icon: Users,
+    description: "Schedule system training",
+    link: "/support/training"
+  }
+]
 
 export default function Landing() {
   const navigate = useNavigate()
-  const { data, error, isLoading, execute } = useApi();
-  const [backendMessage, setBackendMessage] = useState('');
-  const [dbStatus, setDbStatus] = useState('');
+  const [imageStates, setImageStates] = useState({
+    pnp: { loaded: false, error: false },
+    rfu: { loaded: false, error: false },
+    office: { loaded: false, error: false }
+  });
 
-  useEffect(() => {
-    const testConnections = async () => {
-      try {
-        // Test basic backend connectivity
-        const response = await axios.get('http://localhost:3000/api/test');
-        setBackendMessage(response.data.message);
+  // Image loading handler
+  const handleImageLoad = (image: keyof typeof imageStates) => {
+    console.log(`Image loaded successfully: ${image}`);
+    setImageStates(prev => ({
+      ...prev,
+      [image]: { loaded: true, error: false }
+    }));
+  };
 
-        // Test database connectivity
-        const dbResponse = await axios.post('http://localhost:3000/api/test', {
-          message: 'Connection test ' + new Date().toISOString()
-        });
-        setDbStatus(dbResponse.data.message);
-        
-        // Get latest test
-        const latestResponse = await axios.get('http://localhost:3000/api/test/latest');
-        console.log('Latest test:', latestResponse.data);
-        
-      } catch (error) {
-        console.error('Connection error:', error);
-        setBackendMessage('Backend connection failed');
-        setDbStatus('Database connection failed');
-      }
-    };
+  const handleImageError = (image: keyof typeof imageStates) => {
+    console.error(`Failed to load image: ${image}`);
+    setImageStates(prev => ({
+      ...prev,
+      [image]: { loaded: false, error: true }
+    }));
+  };
 
-    testConnections();
-  }, []);
-
-  // Add this function to handle smooth scrolling
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId)
     if (element) {
@@ -47,372 +572,555 @@ export default function Landing() {
     }
   }
 
+  // Add scroll progress indicator
+  const [scrollProgress, setScrollProgress] = useState(0)
+  
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalScroll = document.documentElement.scrollHeight - window.innerHeight
+      const currentProgress = (window.scrollY / totalScroll) * 100
+      setScrollProgress(currentProgress)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background relative">
+      {/* Progress bar */}
+      <motion.div 
+        className="fixed top-0 left-0 right-0 h-1 bg-primary z-50"
+        style={{ scaleX: scrollProgress / 100, transformOrigin: '0%' }}
+      />
+
       {/* Navigation */}
       <nav className="fixed top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => {
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-          }}>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <Brain className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-bold tracking-tight">FACERENDER</span>
-              <span className="text-xs text-muted-foreground">AI Composite System</span>
-            </div>
-          </div>
-          <div className="hidden md:flex items-center space-x-8">
-            <button 
-              onClick={() => scrollToSection('features')} 
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Features
-            </button>
-            <button 
-              onClick={() => scrollToSection('benefits')} 
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Benefits
-            </button>
-            <button 
-              onClick={() => scrollToSection('contact')} 
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Contact
-            </button>
+          <Logo />
+          <div className="flex items-center space-x-4">
             <ModeToggle />
-            <Button onClick={() => navigate('/auth')}>Get Started</Button>
+            <Button onClick={() => navigate('/auth')}>Sign In</Button>
           </div>
-          <button className="md:hidden">
-            <Menu className="h-6 w-6" />
-          </button>
         </div>
       </nav>
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative overflow-hidden">
+        <section className="relative min-h-[100vh] flex items-center">
           <div className="absolute inset-0 bg-grid-slate-900/[0.04] bg-[size:75px_75px] [mask-image:radial-gradient(white,transparent_85%)] dark:bg-grid-slate-100/[0.03]" />
-          <div className="container relative flex min-h-[calc(100vh-4rem)] items-center justify-center">
-            <div className="flex max-w-[64rem] flex-col items-center text-center">
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                Next Generation{" "}
-                <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  Facial Composite System
-                </span>
-              </h1>
-              <p className="mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
-                Advanced AI-powered facial composite creation tool for law enforcement.
-                Create accurate, detailed facial composites in minutes with our state-of-the-art technology.
-              </p>
-              <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Button size="lg" className="min-w-[200px]" onClick={() => navigate("/auth")}>
-                  Get Started <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="lg" className="min-w-[200px]">
-                  Watch Demo
-                </Button>
-              </div>
-              <div className="mt-12 flex items-center justify-center gap-8 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Shield className="h-5 w-5" />
-                  <span>Enterprise-grade security</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Zap className="h-5 w-5" />
-                  <span>Lightning fast results</span>
-                </div>
-                <div className="mt-4 text-center space-y-2">
-                  {backendMessage && (
-                    <div className="text-muted-foreground">
-                      Backend Status: {backendMessage}
-                    </div>
+          <div className="container relative h-screen flex items-center justify-between gap-8 pt-16">
+            <div className="flex max-w-[600px] flex-col">
+              {/* Logos - Enhanced with stagger animation */}
+              <motion.div 
+                className="flex items-center gap-4 mb-6 relative"
+                initial="hidden"
+                animate="visible"
+                variants={{
+                  visible: { transition: { staggerChildren: 0.1 } }
+                }}
+              >
+                <motion.div variants={{
+                  hidden: { opacity: 0, x: -20 },
+                  visible: { opacity: 1, x: 0 }
+                }} className="relative w-20 h-20">
+                  {(!imageStates.pnp.loaded || imageStates.pnp.error) && (
+                    <ImagePlaceholder className="h-20 w-20" />
                   )}
-                  {dbStatus && (
-                    <div className="text-muted-foreground">
-                      Database Status: {dbStatus}
-                    </div>
+                  <img 
+                    src="/images/pnp-logo.png" 
+                    alt="PNP Logo" 
+                    className={cn(
+                      "h-20 w-20 object-contain transition-all duration-300",
+                      imageStates.pnp.loaded && !imageStates.pnp.error ? "opacity-100" : "opacity-0 absolute"
+                    )}
+                    onLoad={() => handleImageLoad('pnp')}
+                    onError={() => handleImageError('pnp')}
+                  />
+                </motion.div>
+                
+                <motion.div variants={{
+                  hidden: { opacity: 0, x: -20 },
+                  visible: { opacity: 1, x: 0 }
+                }} className="relative w-32 h-32">
+                  {(!imageStates.rfu.loaded || imageStates.rfu.error) && (
+                    <ImagePlaceholder className="h-32 w-32" />
                   )}
-                </div>
-              </div>
+                  <img 
+                    src="/images/rfu-car-logo.png" 
+                    alt="RFU CAR Logo" 
+                    className={cn(
+                      "h-32 w-32 object-contain transition-all duration-300",
+                      imageStates.rfu.loaded && !imageStates.rfu.error ? "opacity-100" : "opacity-0 absolute"
+                    )}
+                    onLoad={() => handleImageLoad('rfu')}
+                    onError={() => handleImageError('rfu')}
+                  />
+                </motion.div>
+              </motion.div>
+
+              {/* Hero content - Enhanced animations */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+                  Regional Forensic Unit<br/>
+                  <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    Facial Composite System
+                  </span>
+                </h1>
+                <p className="mt-6 text-lg text-muted-foreground md:text-xl">
+                  Official digital facial composite system for the Regional Forensic Unit - 
+                  <span className="font-medium text-foreground"> Cordillera Administrative Region (RFU-CAR)</span>.
+                </p>
+                <motion.div 
+                  className="mt-8 flex items-center gap-4"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 }}
+                >
+                  <Button 
+                    size="lg" 
+                    onClick={() => navigate("/auth")}
+                    className="group relative overflow-hidden"
+                  >
+                    <span className="relative z-10">Access System</span>
+                    <motion.div
+                      className="absolute inset-0 bg-primary-foreground"
+                      initial={{ x: '-100%' }}
+                      whileHover={{ x: 0 }}
+                      transition={{ duration: 0.3 }}
+                    />
+                    <ArrowRight className="ml-2 h-4 w-4 relative z-10 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    onClick={() => scrollToSection('contact')}
+                    className="group"
+                  >
+                    Contact Support
+                    <ChevronDown className="ml-2 h-4 w-4 transition-transform group-hover:translate-y-1" />
+                  </Button>
+                </motion.div>
+              </motion.div>
             </div>
+
+            {/* Office image - Enhanced */}
+            <motion.div 
+              className="hidden lg:block relative w-[600px] h-[400px] rounded-lg overflow-hidden"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+            >
+              {(!imageStates.office.loaded || imageStates.office.error) && (
+                <ImagePlaceholder className="w-full h-full" />
+              )}
+              <img 
+                src="/images/rfu-car-office.jpg" 
+                alt="RFU CAR Office"
+                className={cn(
+                  "w-full h-full object-cover object-center transition-all duration-500",
+                  imageStates.office.loaded && !imageStates.office.error ? "opacity-100" : "opacity-0 absolute"
+                )}
+                onLoad={() => handleImageLoad('office')}
+                onError={() => handleImageError('office')}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+            </motion.div>
+          </div>
+
+          {/* Improved scroll indicator */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1, duration: 0.5 }}
+              className="text-center"
+            >
+              <motion.div
+                animate={{ y: [0, 8, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="cursor-pointer"
+                onClick={() => scrollToSection('features')}
+              >
+                <ChevronDown className="h-5 w-5 text-primary" />
+              </motion.div>
+            </motion.div>
           </div>
         </section>
 
         {/* Features Section */}
-        <section id="features" className="py-24">
+        <section id="features" className="py-32 custom-scroll">
           <div className="container">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-                Powerful Features
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Everything you need to create accurate facial composites
-              </p>
-            </div>
-            <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                {
-                  title: "AI-Powered Alignment",
-                  description: "Automatic feature alignment and proportion matching using advanced AI algorithms",
-                  icon: <CheckCircle className="h-10 w-10 text-primary" />
-                },
-                {
-                  title: "Real-time Collaboration",
-                  description: "Work together with team members in real-time on composite creation",
-                  icon: <Zap className="h-10 w-10 text-primary" />
-                },
-                {
-                  title: "Secure Database",
-                  description: "Centralized, secure storage of facial features and completed composites",
-                  icon: <Shield className="h-10 w-10 text-primary" />
-                },
-                // Add more features as needed
-              ].map((feature, i) => (
-                <div key={i} className="rounded-lg border bg-card p-8">
-                  {feature.icon}
-                  <h3 className="mt-4 text-xl font-semibold">{feature.title}</h3>
-                  <p className="mt-2 text-muted-foreground">{feature.description}</p>
-                </div>
+            <SectionHeader 
+              badge="Features"
+              title="AI-Powered Composite Creation"
+              description="Advanced artificial intelligence capabilities for precise and efficient facial composite generation"
+            />
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              {features.map((feature, i) => (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <FeatureCard {...feature} />
+                </motion.div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Benefits Section */}
-        <section id="benefits" className="bg-muted/50 py-24">
+        {/* Quick Access Section - Updated */}
+        <section id="actions" className="py-32 bg-muted/30 custom-scroll">
           <div className="container">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-                Why Choose FaceRender
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Transform your facial composite workflow
-              </p>
-            </div>
-            <div className="mt-16 grid gap-8 sm:grid-cols-2">
-              {[
-                {
-                  title: "Increased Accuracy",
-                  description: "Create more accurate composites with AI-assisted feature matching and alignment"
-                },
-                {
-                  title: "Time Savings",
-                  description: "Reduce composite creation time by up to 60% with automated workflows"
-                },
-                {
-                  title: "Better Collaboration",
-                  description: "Work seamlessly with team members and stakeholders in real-time"
-                },
-                {
-                  title: "Enhanced Security",
-                  description: "Enterprise-grade security ensures your data remains protected"
-                }
-              ].map((benefit, i) => (
-                <div key={i} className="flex gap-4">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-                    <CheckCircle className="h-4 w-4 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{benefit.title}</h3>
-                    <p className="mt-1 text-muted-foreground">{benefit.description}</p>
-                  </div>
-                </div>
+            <SectionHeader 
+              badge="Quick Access"
+              title="Essential Tools"
+              description="Streamlined access to critical investigation resources. Click on cards to learn more."
+            />
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+              {quickAccess.map((item, i) => (
+                <motion.div
+                  key={item.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <QuickAccessCard item={item} onClick={navigate} />
+                </motion.div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="py-24">
-          <div className="container">
-            <div className="rounded-[2rem] bg-primary p-12 text-center">
-              <h2 className="text-3xl font-bold tracking-tight text-primary-foreground sm:text-4xl">
-                Ready to get started?
-              </h2>
-              <p className="mx-auto mt-4 max-w-2xl text-lg text-primary-foreground/90">
-                Join law enforcement agencies worldwide using FaceRender to create more accurate facial composites.
-              </p>
-              <div className="mt-8 flex justify-center gap-4">
-                <Button size="lg" variant="secondary">
-                  Request Demo
-                </Button>
-                <Button size="lg" variant="outline" className="bg-primary-foreground">
-                  Contact Sales
-                </Button>
+        {/* Metrics Section */}
+        <section id="metrics" className="py-32 relative overflow-hidden custom-scroll">
+          <div className="absolute inset-0 bg-grid-slate-900/[0.04] bg-[size:75px_75px] dark:bg-grid-slate-100/[0.03]" />
+          <div className="container relative">
+            <SectionHeader 
+              badge="Performance"
+              title="System Metrics"
+              description="Real-time statistics and operational performance indicators"
+            />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+              {systemMetrics.map((metric, i) => (
+                <motion.div
+                  key={metric.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <Card className="h-full hover:shadow-lg transition-all duration-300 relative overflow-hidden group">
+                    <CardContent className="p-6">
+                      <div className="flex flex-col items-center">
+                        {/* Circular Progress */}
+                        <CircularProgress 
+                          value={metric.percentage} 
+                          className="mb-4"
+                        />
+                        
+                        {/* Metric Info */}
+                        <div className="text-center space-y-2">
+                          <div className="flex items-center justify-center gap-2">
+                            <h3 className="font-semibold text-lg">{metric.label}</h3>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="w-[200px] text-sm">{metric.info}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          
+                          <p className="text-3xl font-bold tracking-tight">
+                            {typeof metric.value === 'number' && metric.label === "Processing Time" 
+                              ? `${metric.value}min`
+                              : metric.value.toLocaleString()}
+                          </p>
+                          
+                          <p className="text-sm text-muted-foreground">
+                            {metric.description}
+                          </p>
+
+                          {/* Trend Indicator */}
+                          <div className={cn(
+                            "flex items-center justify-center gap-1 text-sm",
+                            metric.trendType === "up" ? "text-green-500" : 
+                            metric.trendType === "down" ? "text-red-500" : 
+                            "text-muted-foreground"
+                          )}>
+                            {metric.trendType === "up" && <TrendingUp className="h-4 w-4" />}
+                            {metric.trendType === "down" && <TrendingDown className="h-4 w-4" />}
+                            <span>{metric.trend}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Decorative gradient */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Security Section */}
+        <section id="security" className="py-32 bg-muted/30 relative overflow-hidden custom-scroll">
+          <div className="absolute inset-0 bg-grid-slate-900/[0.04] bg-[size:75px_75px] dark:bg-grid-slate-100/[0.03]" />
+          <div className="container relative">
+            <SectionHeader 
+              badge="Security"
+              title="Evidence-Grade Protection"
+              description="Enterprise-level security measures compliant with PNP standards"
+            />
+            
+            {/* Main Security Cards */}
+            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              {securityFeatures.map((item, i) => (
+                <motion.div
+                  key={item.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <Card className="h-full hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
+                    <CardContent className="p-8 flex flex-col min-h-[420px]"> {/* Increased padding and fixed height */}
+                      {/* Icon Header */}
+                      <div className="text-center mb-8"> {/* Increased bottom margin */}
+                        <div className={cn(
+                          "w-20 h-20 rounded-2xl mx-auto mb-6 flex items-center justify-center", // Larger icon container
+                          item.color
+                        )}>
+                          <item.icon className="h-10 w-10 text-foreground" /> {/* Larger icon */}
+                        </div>
+                        <h3 className="text-xl font-semibold mb-3">{item.title}</h3> {/* Larger title */}
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {item.description}
+                        </p>
+                      </div>
+
+                      {/* Features List - Now with better spacing */}
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        transition={{ delay: 0.2 }}
+                        className="space-y-4 mt-auto" // Push to bottom and increase spacing
+                      >
+                        {item.features.map((feature, index) => (
+                          <motion.div
+                            key={feature}
+                            initial={{ opacity: 0, x: -20 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2 + (index * 0.1) }}
+                            className="flex items-center gap-3 px-2 py-1 rounded-lg hover:bg-muted/50 transition-colors"
+                          >
+                            <div className={cn(
+                              "h-2 w-2 rounded-full shrink-0", // Slightly larger dot
+                              item.color.replace("/10", "/50")
+                            )} />
+                            <span className="text-sm font-medium">{feature}</span>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+
+                      {/* Enhanced hover gradient */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Enhanced Additional Info Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="mt-20" // Increased top margin
+            >
+              <Card className="max-w-3xl mx-auto bg-card/50 backdrop-blur">
+                <CardContent className="p-8"> {/* Increased padding */}
+                  <div className="flex flex-wrap items-center justify-center gap-3 mb-6"> {/* Increased gap and margin */}
+                    <Badge variant="outline" className="bg-primary/10 px-4 py-1.5 text-sm"> {/* Larger badges */}
+                      <Lock className="h-4 w-4 mr-2" />
+                      Security Certified
+                    </Badge>
+                    <Badge variant="outline" className="bg-primary/10 px-4 py-1.5 text-sm">
+                      <Shield className="h-4 w-4 mr-2" />
+                      PNP Compliant
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed text-center max-w-2xl mx-auto">
+                    Our system adheres to the highest security standards required by law enforcement agencies, 
+                    ensuring the integrity and confidentiality of all case-related data.
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Contact Section */}
+        <section id="contact" className="py-32 relative custom-scroll">
+          <div className="absolute inset-0 bg-grid-slate-900/[0.04] bg-[size:75px_75px] dark:bg-grid-slate-100/[0.03]" />
+          <div className="container relative">
+            <SectionHeader 
+              badge="Support"
+              title="Get in Touch"
+              description="Our dedicated support team is here to help you with any questions or technical assistance"
+            />
+            
+            <div className="max-w-5xl mx-auto">
+              <div className="grid md:grid-cols-2 gap-8">
+                {/* Contact Information - Simplified */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                >
+                  <Card className="h-full"> {/* Added h-full for equal height */}
+                    <CardContent className="p-6">
+                      <h3 className="text-lg font-semibold mb-6">Contact Information</h3>
+                      <div className="space-y-6">
+                        {contactInfo.map((info) => (
+                          <motion.div
+                            key={info.label}
+                            className="group"
+                            whileHover={{ x: 5 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                          >
+                            {info.link ? (
+                              <a 
+                                href={info.link}
+                                target={info.type === 'address' ? "_blank" : undefined}
+                                rel={info.type === 'address' ? "noopener noreferrer" : undefined}
+                                className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                              >
+                                <div className="rounded-full p-2 bg-primary/10 shrink-0">
+                                  <info.icon className="h-4 w-4 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">{info.label}</p>
+                                  <p className="text-sm text-muted-foreground group-hover:text-primary transition-colors">
+                                    {info.value}
+                                  </p>
+                                </div>
+                              </a>
+                            ) : (
+                              <div className="flex items-start gap-3 p-2">
+                                <div className="rounded-full p-2 bg-primary/10 shrink-0">
+                                  <info.icon className="h-4 w-4 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">{info.label}</p>
+                                  <p className="text-sm text-muted-foreground">{info.value}</p>
+                                </div>
+                              </div>
+                            )}
+                          </motion.div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Support Resources - Simplified */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                >
+                  <Card className="h-full"> {/* Added h-full for equal height */}
+                    <CardContent className="p-6">
+                      <h3 className="text-lg font-semibold mb-6">Support Resources</h3>
+                      <div className="space-y-6">
+                        {/* Support Actions Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                          {supportActions.map((action) => (
+                            <Button
+                              key={action.label}
+                              variant="outline"
+                              className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-primary/5 relative group"
+                              onClick={() => navigate(action.link)}
+                            >
+                              <action.icon className="h-5 w-5" />
+                              <span className="font-medium text-sm">{action.label}</span>
+                              <p className="text-xs text-muted-foreground text-center">
+                                {action.description}
+                              </p>
+                              <motion.div
+                                className="absolute -right-1 -top-1 opacity-0 group-hover:opacity-100"
+                                initial={{ scale: 0.8 }}
+                                whileHover={{ scale: 1 }}
+                              >
+                                <Badge variant="secondary" className="text-xs">
+                                  View
+                                </Badge>
+                              </motion.div>
+                            </Button>
+                          ))}
+                        </div>
+
+                        {/* IT Support Contact - Simplified */}
+                        <Card className="bg-primary/5 border-primary/20">
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="rounded-full p-2 bg-primary/10">
+                                <Headset className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">IT Support</p>
+                                <p className="text-sm text-muted-foreground">
+                                  RFU-CAR Technical Team
+                                </p>
+                              </div>
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                className="ml-auto"
+                                onClick={() => window.location.href = 'mailto:it.support@rfu-car.pnp.gov.ph'}
+                              >
+                                <Mail className="h-4 w-4 mr-1" />
+                                Contact
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      {/* Contact Section */}
-      <section id="contact" className="py-24 bg-muted/50">
+      {/* Footer - enhanced */}
+      <footer className="border-t py-6">
         <div className="container">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-              Get in Touch
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Have questions? Our team is here to help.
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-muted-foreground text-center sm:text-left">
+              © 2024 Regional Forensic Unit - CAR. All rights reserved.
             </p>
-          </div>
-          <div className="mt-16 grid gap-8 md:grid-cols-3">
-            {/* Email Contact */}
-            <div className="rounded-xl border bg-card p-8 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <Mail className="h-6 w-6 text-primary" />
-              </div>
-              <h3 className="mb-2 font-semibold">Email Us</h3>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Available 24/7 for your inquiries
-              </p>
-              <a 
-                href="mailto:support@facerender.com" 
-                className="text-primary hover:underline"
-              >
-                support@facerender.com
-              </a>
-            </div>
-
-            {/* Phone Contact */}
-            <div className="rounded-xl border bg-card p-8 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <Phone className="h-6 w-6 text-primary" />
-              </div>
-              <h3 className="mb-2 font-semibold">Call Us</h3>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Mon-Fri from 9am to 5pm EST
-              </p>
-              <a 
-                href="tel:+15551234567" 
-                className="text-primary hover:underline"
-              >
-                +1 (555) 123-4567
-              </a>
-            </div>
-
-            {/* Office Location */}
-            <div className="rounded-xl border bg-card p-8 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <MapPin className="h-6 w-6 text-primary" />
-              </div>
-              <h3 className="mb-2 font-semibold">Visit Us</h3>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Our headquarters location
-              </p>
-              <span className="text-primary">
-                123 Security Ave, Suite 100<br />
-                Washington, DC 20001
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container py-12">
-          {/* Main Footer Content */}
-          <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
-            {/* Brand Column */}
-            <div className="lg:col-span-2">
-              <div className="flex items-center space-x-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-                  <Brain className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xl font-bold">FACERENDER</span>
-                  <span className="text-xs text-muted-foreground">AI Composite System</span>
-                </div>
-              </div>
-              <p className="mt-4 text-sm text-muted-foreground max-w-xs">
-                Next generation facial composite system powered by artificial intelligence, trusted by law enforcement agencies worldwide.
-              </p>
-              <div className="mt-6 flex space-x-4">
-                <Button variant="ghost" size="icon" className="hover:text-primary">
-                  <Twitter className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="hover:text-primary">
-                  <Linkedin className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="hover:text-primary">
-                  <Github className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Quick Links */}
-            <div>
-              <h3 className="text-sm font-semibold">Product</h3>
-              <ul className="mt-4 space-y-3">
-                {['Features', 'Benefits', 'Security', 'Pricing'].map((item) => (
-                  <li key={item}>
-                    <button 
-                      onClick={() => scrollToSection(item.toLowerCase())}
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      {item}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Company */}
-            <div>
-              <h3 className="text-sm font-semibold">Company</h3>
-              <ul className="mt-4 space-y-3">
-                {['About', 'Blog', 'Careers', 'Contact'].map((item) => (
-                  <li key={item}>
-                    <button 
-                      onClick={() => scrollToSection(item.toLowerCase())}
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      {item}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Legal */}
-            <div>
-              <h3 className="text-sm font-semibold">Legal</h3>
-              <ul className="mt-4 space-y-3">
-                {['Privacy', 'Terms', 'Security', 'Compliance'].map((item) => (
-                  <li key={item}>
-                    <button 
-                      onClick={() => scrollToSection(item.toLowerCase())}
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      {item}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Bottom Bar */}
-          <div className="mt-12 pt-8 border-t">
-            <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-              <p className="text-sm text-muted-foreground">
-                © 2024 FaceRender. All rights reserved.
-              </p>
-              <div className="flex items-center gap-4">
-                <Button variant="link" className="text-sm text-muted-foreground hover:text-primary">
-                  Privacy Policy
-                </Button>
-                <Button variant="link" className="text-sm text-muted-foreground hover:text-primary">
-                  Terms of Service
-                </Button>
-                <Button variant="link" className="text-sm text-muted-foreground hover:text-primary">
-                  Cookie Policy
-                </Button>
-              </div>
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="sm">Privacy Policy</Button>
+              <Separator orientation="vertical" className="h-4" />
+              <Button variant="ghost" size="sm">Terms of Use</Button>
             </div>
           </div>
         </div>

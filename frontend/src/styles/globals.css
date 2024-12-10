@@ -1,0 +1,49 @@
+/* Custom Scrollbar Styles */
+@layer base {
+  /* Base scrollbar styles */
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 8px;
+    border: 3px solid hsl(var(--background));
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted) / 0.4);
+  }
+
+  /* Dark mode specific adjustments */
+  .dark {
+    ::-webkit-scrollbar-thumb {
+      background: hsl(var(--muted) / 0.2);
+      border: 3px solid hsl(var(--background));
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: hsl(var(--muted) / 0.3);
+    }
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted) / 0.3) transparent;
+  }
+
+  /* Firefox dark mode */
+  .dark * {
+    scrollbar-color: hsl(var(--muted) / 0.2) transparent;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}

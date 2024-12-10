@@ -17,6 +17,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/composite-builder" element={<CompositeBuilder />} />
           <Route path="/composite-editor" element={<CompositeEditor />} />
+          <Route path="/composite-editor/:id" element={<CompositeEditor />} />
         </Routes>
       </Router>
       <Toaster />

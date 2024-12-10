@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApi } from '@/hooks/useApi';
 import { ModeToggle } from "@/components/mode-toggle"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Brain, Mail, Phone, MapPin, Image as ImageIcon, ChevronDown, Shield, Lock, FileCheck, Database, Users, Clock, Fingerprint, ScrollText, LayoutDashboard, Search, FileText, AlertCircle, PhoneCall, GraduationCap, Headset } from "lucide-react"
+import { ArrowRight, Brain, Mail, Phone, MapPin, Image as ImageIcon, ChevronDown, Shield, Lock, FileCheck, Database, Users, Clock, Fingerprint, ScrollText, LayoutDashboard, Search, FileText, AlertCircle, PhoneCall, GraduationCap, Headset, UserSquare2, User } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import axios from 'axios';
 import { cn } from "@/lib/utils"
@@ -14,6 +14,7 @@ import { CircularProgress } from "@/components/ui/circular-progress"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { HelpCircle, TrendingUp, TrendingDown } from "lucide-react"
 import { LucideIcon } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 // Add placeholder component
 const ImagePlaceholder = ({ className }: { className?: string }) => (
@@ -448,29 +449,41 @@ const securityFeatures = [
 ]
 
 // Replace the existing FaceMeshLogo component with this
-const Logo = () => (
-  <div className="flex items-center gap-2">
-    <svg
-      xmlns="http://www.w3.org/2000/svg" 
-      viewBox="0 0 24 24" 
-      fill="none"
-      stroke="currentColor" 
-      strokeWidth="2"
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-      className="h-6 w-6"
+const Logo = () => {
+  const scrollToTop = () => {
+    console.log('Scrolling to top'); // Debug log
+    window.scrollTo({ 
+      top: 0, 
+      behavior: 'smooth' 
+    });
+  };
+
+  return (
+    <div 
+      className="flex items-center gap-3 cursor-pointer group select-none"
+      onClick={scrollToTop}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          scrollToTop();
+        }
+      }}
+      aria-label="Return to top of page"
     >
-      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-      <path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08v0c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0l2.96 2.66" />
-      <path d="m18 15-2-2" />
-      <path d="m15 18-2-2" />
-    </svg>
-    <div className="flex flex-col">
-      <span className="text-xl font-bold tracking-tight">FACERENDER</span>
-      <span className="text-xs text-muted-foreground">RFU-CAR Composite System</span>
+      <div className="relative flex h-10 w-10 items-center justify-center">
+        <div className="absolute inset-0 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors" />
+        <div className="relative flex items-center justify-center">
+          <User className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
+        </div>
+      </div>
+      <div className="flex flex-col group-hover:translate-x-0.5 transition-transform">
+        <span className="text-xl font-bold tracking-tight">FACERENDER</span>
+        <span className="text-xs text-muted-foreground">RFU-CAR Composite System</span>
+      </div>
     </div>
-  </div>
-)
+  );
+};
 
 // Add this type for contact info
 interface ContactInfo {

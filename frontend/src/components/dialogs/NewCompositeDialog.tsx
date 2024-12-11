@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { useNavigate } from "react-router-dom"
+import { ChevronRight, ChevronLeft } from "lucide-react"
 
 // Add proper type definitions for props
 interface NewCompositeDialogProps {
@@ -65,6 +66,8 @@ interface FormData {
   caseAssigned: string
 }
 
+type Section = 'operator' | 'witness' | 'incident-1' | 'incident-2' | 'verification'
+
 export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewCompositeDialogProps) {
   const navigate = useNavigate()
 
@@ -104,6 +107,57 @@ export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewComposit
     initialStatementRecorded: 'yes',
     caseAssigned: 'yes'
   })
+
+  const [currentSection, setCurrentSection] = useState<Section>('operator')
+
+  const getSectionTitle = (section: Section) => {
+    switch(section) {
+      case 'operator':
+        return 'Operator Details'
+      case 'witness': 
+        return 'Witness Details'
+      case 'incident-1':
+        return 'Incident Details (1/2)'
+      case 'incident-2':
+        return 'Incident Details (2/2)'
+      case 'verification':
+        return 'Verification Questions'
+    }
+  }
+
+  const handleNext = () => {
+    switch(currentSection) {
+      case 'operator':
+        setCurrentSection('witness')
+        break
+      case 'witness':
+        setCurrentSection('incident-1')
+        break
+      case 'incident-1':
+        setCurrentSection('incident-2')
+        break
+      case 'incident-2':
+        setCurrentSection('verification')
+        break
+    }
+  }
+
+  const handlePrevious = () => {
+    switch(currentSection) {
+      case 'witness':
+        setCurrentSection('operator')
+        break
+      case 'incident-1':
+        setCurrentSection('witness')
+        break
+      case 'incident-2':
+        setCurrentSection('incident-1')
+        break
+      case 'verification':
+        setCurrentSection('incident-2')
+        break
+    }
+  }
 
   const handleSubmit = () => {
     // Call onSubmit if provided
@@ -184,27 +238,43 @@ export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewComposit
 
   return (
     <Dialog open={open} onOpenChange={handleCancel}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto
-        [&::-webkit-scrollbar]:w-2
-        [&::-webkit-scrollbar-track]:bg-muted/30
-        [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20
-        [&::-webkit-scrollbar-thumb]:rounded-full
-        [&::-webkit-scrollbar-thumb]:border-2
-        [&::-webkit-scrollbar-thumb]:border-background
-        [&::-webkit-scrollbar-thumb]:hover:bg-muted-foreground/30
-        hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30
-        ">
+      <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">Create New Composite</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-6 py-4">
-          {/* Operator Details */}
-          <div className="space-y-4 rounded-lg border p-4">
+        <div className="flex justify-between items-center mt-2">
+          <div className="flex items-center gap-2 w-full">
+            {(['operator', 'witness', 'incident-1', 'incident-2', 'verification'] as Section[]).map((section, index) => (
+              <div key={section} className="flex items-center w-full">
+                <div 
+                  className={`h-2 rounded-full flex-1 transition-colors ${
+                    currentSection === section ? 'bg-primary' :
+                    index < ['operator', 'witness', 'incident-1', 'incident-2', 'verification'].indexOf(currentSection) 
+                      ? 'bg-primary/60' : 'bg-muted'
+                  }`}
+                />
+                {index < 4 && <div className="w-2" />}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="py-4">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold">Operator Details</h3>
-              <Badge variant="outline">Step 1 of 4</Badge>
+              <h3 className="text-lg font-semibold">{getSectionTitle(currentSection)}</h3>
+              <Badge variant="outline">
+                Step {currentSection === 'operator' ? '1' : 
+                      currentSection === 'witness' ? '2' :
+                      currentSection === 'incident-1' ? '3' :
+                      currentSection === 'incident-2' ? '4' : '5'} of 5
+              </Badge>
             </div>
+          </div>
+
+          {/* Operator Details Section */}
+          {currentSection === 'operator' && (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Rank</Label>
@@ -261,14 +331,10 @@ export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewComposit
                 />
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Witness Details */}
-          <div className="space-y-4 rounded-lg border p-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold">Witness Details</h3>
-              <Badge variant="outline">Step 2 of 4</Badge>
-            </div>
+          {/* Witness Details Section */}
+          {currentSection === 'witness' && (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>First Name</Label>
@@ -314,183 +380,178 @@ export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewComposit
                 />
               </div>
             </div>
-          </div>
+          )}
 
           {/* Incident Details Section */}
-          <div className="space-y-4 rounded-lg border p-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold">Incident Details</h3>
-              <Badge variant="outline">Step 3 of 4</Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Case Number</Label>
-                <Input 
-                  placeholder="Enter case number"
-                  value={formData.caseNumber}
-                  onChange={(e) => setFormData({...formData, caseNumber: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label>Incident Type</Label>
-                <Select 
-                  value={formData.incidentType}
-                  onValueChange={(value) => setFormData({...formData, incidentType: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select incident type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="robbery">Robbery</SelectItem>
-                    <SelectItem value="theft">Theft</SelectItem>
-                    <SelectItem value="assault">Assault</SelectItem>
-                    <SelectItem value="homicide">Homicide</SelectItem>
-                    <SelectItem value="kidnapping">Kidnapping</SelectItem>
-                    <SelectItem value="sexual-assault">Sexual Assault</SelectItem>
-                    <SelectItem value="missing-person">Missing Person</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Incident Date</Label>
-                <Input 
-                  type="date"
-                  value={formData.incidentDate}
-                  onChange={(e) => setFormData({...formData, incidentDate: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label>Incident Time</Label>
-                <Input 
-                  type="time"
-                  value={formData.incidentTime}
-                  onChange={(e) => setFormData({...formData, incidentTime: e.target.value})}
-                />
-              </div>
-              <div className="col-span-2">
-                <Label>Incident Location</Label>
-                <Textarea 
-                  placeholder="Enter complete incident location"
-                  value={formData.incidentLocation}
-                  onChange={(e) => setFormData({...formData, incidentLocation: e.target.value})}
-                  rows={2}
-                />
+          {currentSection === 'incident-1' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Case Number</Label>
+                  <Input 
+                    placeholder="Enter case number"
+                    value={formData.caseNumber}
+                    onChange={(e) => setFormData({...formData, caseNumber: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Incident Type</Label>
+                  <Select 
+                    value={formData.incidentType}
+                    onValueChange={(value) => setFormData({...formData, incidentType: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select incident type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="robbery">Robbery</SelectItem>
+                      <SelectItem value="theft">Theft</SelectItem>
+                      <SelectItem value="assault">Assault</SelectItem>
+                      <SelectItem value="homicide">Homicide</SelectItem>
+                      <SelectItem value="kidnapping">Kidnapping</SelectItem>
+                      <SelectItem value="sexual-assault">Sexual Assault</SelectItem>
+                      <SelectItem value="missing-person">Missing Person</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Incident Date</Label>
+                  <Input 
+                    type="date"
+                    value={formData.incidentDate}
+                    onChange={(e) => setFormData({...formData, incidentDate: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Incident Time</Label>
+                  <Input 
+                    type="time"
+                    value={formData.incidentTime}
+                    onChange={(e) => setFormData({...formData, incidentTime: e.target.value})}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label>Incident Location</Label>
+                  <Textarea 
+                    placeholder="Enter complete incident location"
+                    value={formData.incidentLocation}
+                    onChange={(e) => setFormData({...formData, incidentLocation: e.target.value})}
+                    rows={2}
+                  />
+                </div>
               </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              <div>
-                <Label>Suspect Gender</Label>
-                <Select 
-                  value={formData.suspectGender}
-                  onValueChange={(value) => setFormData({...formData, suspectGender: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Suspect Ethnicity</Label>
-                <Select 
-                  value={formData.suspectEthnicity}
-                  onValueChange={(value) => setFormData({...formData, suspectEthnicity: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select ethnicity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="tagalog">Tagalog</SelectItem>
-                    <SelectItem value="cebuano">Cebuano</SelectItem>
-                    <SelectItem value="ilocano">Ilocano</SelectItem>
-                    <SelectItem value="bicolano">Bicolano</SelectItem>
-                    <SelectItem value="waray">Waray</SelectItem>
-                    <SelectItem value="kapampangan">Kapampangan</SelectItem>
-                    <SelectItem value="chinese-filipino">Chinese Filipino</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Suspect Age Range</Label>
-                <Select 
-                  value={formData.suspectAgeRange}
-                  onValueChange={(value) => setFormData({...formData, suspectAgeRange: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select age range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="minor">Below 18</SelectItem>
-                    <SelectItem value="18-25">18-25</SelectItem>
-                    <SelectItem value="26-35">26-35</SelectItem>
-                    <SelectItem value="36-45">36-45</SelectItem>
-                    <SelectItem value="46-55">46-55</SelectItem>
-                    <SelectItem value="56+">56 and above</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Suspect Height (cm)</Label>
-                <Input 
-                  type="number"
-                  placeholder="Height in cm"
-                  value={formData.suspectHeight}
-                  onChange={(e) => setFormData({...formData, suspectHeight: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label>Body Build</Label>
-                <Select 
-                  value={formData.suspectBuild}
-                  onValueChange={(value) => setFormData({...formData, suspectBuild: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select build" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="slim">Slim</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="heavy">Heavy</SelectItem>
-                    <SelectItem value="muscular">Muscular</SelectItem>
-                  </SelectContent>
-                </Select>
+          {currentSection === 'incident-2' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Suspect Gender</Label>
+                  <Select 
+                    value={formData.suspectGender}
+                    onValueChange={(value) => setFormData({...formData, suspectGender: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Suspect Ethnicity</Label>
+                  <Select 
+                    value={formData.suspectEthnicity}
+                    onValueChange={(value) => setFormData({...formData, suspectEthnicity: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select ethnicity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tagalog">Tagalog</SelectItem>
+                      <SelectItem value="cebuano">Cebuano</SelectItem>
+                      <SelectItem value="ilocano">Ilocano</SelectItem>
+                      <SelectItem value="bicolano">Bicolano</SelectItem>
+                      <SelectItem value="waray">Waray</SelectItem>
+                      <SelectItem value="kapampangan">Kapampangan</SelectItem>
+                      <SelectItem value="chinese-filipino">Chinese Filipino</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Suspect Age Range</Label>
+                  <Select 
+                    value={formData.suspectAgeRange}
+                    onValueChange={(value) => setFormData({...formData, suspectAgeRange: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select age range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="minor">Below 18</SelectItem>
+                      <SelectItem value="18-25">18-25</SelectItem>
+                      <SelectItem value="26-35">26-35</SelectItem>
+                      <SelectItem value="36-45">36-45</SelectItem>
+                      <SelectItem value="46-55">46-55</SelectItem>
+                      <SelectItem value="56+">56 and above</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Suspect Height (cm)</Label>
+                  <Input 
+                    type="number"
+                    placeholder="Height in cm"
+                    value={formData.suspectHeight}
+                    onChange={(e) => setFormData({...formData, suspectHeight: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Body Build</Label>
+                  <Select 
+                    value={formData.suspectBuild}
+                    onValueChange={(value) => setFormData({...formData, suspectBuild: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select build" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="slim">Slim</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="heavy">Heavy</SelectItem>
+                      <SelectItem value="muscular">Muscular</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2">
+                  <Label>Distinguishing Features</Label>
+                  <Textarea 
+                    placeholder="Scars, tattoos, birthmarks, etc."
+                    value={formData.distinguishingFeatures}
+                    onChange={(e) => setFormData({...formData, distinguishingFeatures: e.target.value})}
+                    rows={2}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label>Additional Notes</Label>
+                  <Textarea 
+                    placeholder="Any other relevant details about the incident or suspect..."
+                    value={formData.incidentNotes}
+                    onChange={(e) => setFormData({...formData, incidentNotes: e.target.value})}
+                    rows={2}
+                  />
+                </div>
               </div>
             </div>
+          )}
 
-            <div>
-              <Label>Distinguishing Features</Label>
-              <Textarea 
-                placeholder="Scars, tattoos, birthmarks, etc."
-                value={formData.distinguishingFeatures}
-                onChange={(e) => setFormData({...formData, distinguishingFeatures: e.target.value})}
-                rows={2}
-              />
-            </div>
-
-            <div>
-              <Label>Additional Notes</Label>
-              <Textarea 
-                placeholder="Any other relevant details about the incident or suspect..."
-                value={formData.incidentNotes}
-                onChange={(e) => setFormData({...formData, incidentNotes: e.target.value})}
-                rows={3}
-              />
-            </div>
-          </div>
-
-          {/* Verification Questions */}
-          <div className="space-y-4 rounded-lg border p-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold">Verification Questions</h3>
-              <Badge variant="outline">Step 4 of 4</Badge>
-            </div>
-            
+          {/* Verification Section */}
+          {currentSection === 'verification' && (
             <div className="grid gap-6">
               <div className="space-y-3">
                 <Label className="text-base">
@@ -572,17 +633,37 @@ export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewComposit
                 </RadioGroup>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={handleCancel}>Cancel</Button>
-          <Button 
-            type="submit" 
-            onClick={handleSubmit}
-          >
-            Proceed
-          </Button>
+          {currentSection !== 'operator' && (
+            <Button
+              variant="outline"
+              onClick={handlePrevious}
+              className="gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+          )}
+
+          {currentSection !== 'verification' ? (
+            <Button 
+              onClick={handleNext}
+              className="gap-2"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleCancel}>Cancel</Button>
+              <Button onClick={handleSubmit}>
+                Create Composite
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

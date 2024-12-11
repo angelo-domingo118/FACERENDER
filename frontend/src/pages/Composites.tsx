@@ -8,7 +8,8 @@ import {
   Plus, Search, Filter, ArrowUpDown, MoreHorizontal,
   Download, Pencil, Trash2, LayoutGrid, LayoutList,
   Clock, User, Globe, FileText, SortAsc, SortDesc,
-  Eye, ZoomIn, ZoomOut, X, Check, User2, UserSquare2, Users, ClipboardCheck
+  Eye, ZoomIn, ZoomOut, X, Check, User2, UserSquare2, Users, ClipboardCheck,
+  RotateCw, Settings, Loader2, AlertTriangle
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -30,12 +31,17 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useNavigate } from "react-router-dom"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Slider } from "@/components/ui/slider"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 export default function Composites() {
   const navigate = useNavigate()
@@ -50,6 +56,38 @@ export default function Composites() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "closed">("all")
   const [sortOrder, setSortOrder] = useState("newest")
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [compositeToDelete, setCompositeToDelete] = useState<string | null>(null)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [exportSettings, setExportSettings] = useState<ExportSettings>({
+    fileType: 'png',
+    quality: 1
+  })
+  const [showBatchExportDialog, setShowBatchExportDialog] = useState(false)
+  const [showBatchDeleteDialog, setShowBatchDeleteDialog] = useState(false)
+  const [showProcessingDialog, setShowProcessingDialog] = useState(false)
+  const [processingStatus, setProcessingStatus] = useState<{
+    total: number;
+    current: number;
+    completed: string[];
+  }>({
+    total: 0,
+    current: 0,
+    completed: []
+  })
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [showStatusDialog, setShowStatusDialog] = useState(false)
+  const [operationStatus, setOperationStatus] = useState<{
+    type: 'success' | 'error' | 'cancelled'
+    operation: 'export' | 'delete'
+    message: string
+    itemCount?: number
+  }>({
+    type: 'success',
+    operation: 'export',
+    message: '',
+  })
   
   const composites = [
     {
@@ -271,11 +309,253 @@ export default function Composites() {
       }
     })
 
+  const handleSelectAll = () => {
+    if (selectedItems.length === filteredComposites.length) {
+      setSelectedItems([])
+    } else {
+      setSelectedItems(filteredComposites.map(c => c.id))
+    }
+  }
+
+  const handleSelectItem = (id: string) => {
+    setSelectedItems(prev => 
+      prev.includes(id) 
+        ? prev.filter(i => i !== id)
+        : [...prev, id]
+    )
+  }
+
+  const handleBatchDelete = () => {
+    setShowBatchDeleteDialog(true)
+  }
+
+  const handleBatchExport = () => {
+    setShowBatchExportDialog(true)
+  }
+
+  const handleRefresh = () => {
+    console.log('Refresh composite list')
+  }
+
+  const handlePreviewClick = (composite: typeof composites[0]) => {
+    setSelectedComposite(composite)
+    setPreviewOpen(true)
+  }
+
+  const handleEditImage = (compositeId: string) => {
+    navigate(`/composite-editor/${compositeId}`)
+  }
+
+  const handleExportComposite = async (compositeId: string) => {
+    setShowExportDialog(false)
+    setShowProcessingDialog(true)
+    setProcessingStatus({
+      total: 1,
+      current: 0,
+      completed: []
+    })
+
+    try {
+      // Simulate export
+      await new Promise(resolve => setTimeout(resolve, 1200))
+      
+      setProcessingStatus(prev => ({
+        ...prev,
+        current: 1,
+        completed: [compositeId]
+      }))
+
+      // Close dialog after delay
+      await new Promise(resolve => setTimeout(resolve, 800))
+      setShowProcessingDialog(false)
+      
+    } catch (error) {
+      console.error('Failed to export:', error)
+      setShowProcessingDialog(false)
+    }
+  }
+
+  const handleDeselectAll = () => {
+    setSelectedItems([])
+  }
+
+  const handleDeleteComposite = (compositeId: string) => {
+    setCompositeToDelete(compositeId)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!compositeToDelete) return
+    
+    // Close confirmation dialog and show processing dialog
+    setDeleteDialogOpen(false)
+    setShowProcessingDialog(true)
+    setProcessingStatus({
+      total: 1,
+      current: 0,
+      completed: []
+    })
+
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 800))
+      
+      // Update progress
+      setProcessingStatus(prev => ({
+        ...prev,
+        current: 1,
+        completed: [compositeToDelete]
+      }))
+
+      // Close dialog after short delay
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      setShowProcessingDialog(false)
+      setCompositeToDelete(null)
+      
+    } catch (error) {
+      console.error('Failed to delete:', error)
+      // Handle error - could show error toast here
+      setShowProcessingDialog(false)
+      setCompositeToDelete(null)
+    }
+  }
+
+  const handleConfirmBatchDelete = async () => {
+    setShowBatchDeleteDialog(false)
+    setShowProcessingDialog(true)
+    setIsCancelling(false)
+    setProcessingStatus({
+      total: selectedItems.length,
+      current: 0,
+      completed: []
+    })
+
+    try {
+      for (let i = 0; i < selectedItems.length; i++) {
+        if (isCancelling) break;
+        
+        const id = selectedItems[i]
+        await new Promise(resolve => setTimeout(resolve, 800))
+        
+        setProcessingStatus(prev => ({
+          ...prev,
+          current: i + 1,
+          completed: [...prev.completed, id]
+        }))
+      }
+
+      // Wait for animation to complete
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setShowProcessingDialog(false)
+
+      if (!isCancelling) {
+        // Show success dialog
+        setShowStatusDialog(true)
+        setOperationStatus({
+          type: 'success',
+          operation: 'delete',
+          message: 'Files were successfully deleted',
+          itemCount: processingStatus.completed.length
+        })
+        setSelectedItems([])
+      } else {
+        // Show cancelled dialog
+        setShowStatusDialog(true)
+        setOperationStatus({
+          type: 'cancelled',
+          operation: 'delete',
+          message: 'Delete operation was cancelled',
+          itemCount: processingStatus.completed.length
+        })
+      }
+    } catch (error) {
+      setShowProcessingDialog(false)
+      // Show error dialog
+      setShowStatusDialog(true)
+      setOperationStatus({
+        type: 'error',
+        operation: 'delete',
+        message: 'An error occurred while deleting files',
+        itemCount: processingStatus.completed.length
+      })
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  const handleConfirmBatchExport = async () => {
+    setShowBatchExportDialog(false)
+    setShowProcessingDialog(true)
+    setIsCancelling(false)
+    setProcessingStatus({
+      total: selectedItems.length,
+      current: 0,
+      completed: []
+    })
+
+    try {
+      for (let i = 0; i < selectedItems.length; i++) {
+        if (isCancelling) break;
+        
+        const id = selectedItems[i]
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        setProcessingStatus(prev => ({
+          ...prev,
+          current: i + 1,
+          completed: [...prev.completed, id]
+        }))
+      }
+
+      // Wait for animation to complete
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setShowProcessingDialog(false)
+
+      if (!isCancelling) {
+        // Show success dialog
+        setShowStatusDialog(true)
+        setOperationStatus({
+          type: 'success',
+          operation: 'export',
+          message: 'Files were successfully exported',
+          itemCount: processingStatus.completed.length
+        })
+      } else {
+        // Show cancelled dialog
+        setShowStatusDialog(true)
+        setOperationStatus({
+          type: 'cancelled',
+          operation: 'export',
+          message: 'Export operation was cancelled',
+          itemCount: processingStatus.completed.length
+        })
+      }
+    } catch (error) {
+      setShowProcessingDialog(false)
+      // Show error dialog
+      setShowStatusDialog(true)
+      setOperationStatus({
+        type: 'error',
+        operation: 'export',
+        message: 'An error occurred while exporting files',
+        itemCount: processingStatus.completed.length
+      })
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
   const renderListView = (composites: typeof composites[0][]) => (
     <div className="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-[50px]">
+              <Checkbox 
+                checked={selectedItems.length === filteredComposites.length}
+                onCheckedChange={handleSelectAll}
+              />
+            </TableHead>
             <TableHead className="w-[150px]">Preview</TableHead>
             <TableHead>ID</TableHead>
             <TableHead>Name</TableHead>
@@ -287,32 +567,24 @@ export default function Composites() {
         </TableHeader>
         <TableBody>
           {composites.map((composite) => (
-            <TableRow key={composite.id} className="group">
+            <TableRow 
+              key={composite.id}
+              className={cn(
+                "group",
+                selectedItems.includes(composite.id) && "bg-accent/50"
+              )}
+            >
+              <TableCell>
+                <Checkbox 
+                  checked={selectedItems.includes(composite.id)}
+                  onCheckedChange={() => handleSelectItem(composite.id)}
+                />
+              </TableCell>
               <TableCell>
                 <div className="relative w-32 h-40 rounded-md bg-muted/30 flex items-center justify-center group-hover:ring-2 ring-primary/20 transition-all">
                   <div className="absolute inset-0 flex items-center justify-center">
                     <FileText className="h-12 w-12 text-muted-foreground/50" />
                     <div className="absolute inset-0 border border-dashed border-muted-foreground/20 rounded-md" />
-                  </div>
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                    <div className="flex flex-col gap-1.5">
-                      <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        className="w-24"
-                        onClick={() => handlePreviewClick(composite)}
-                      >
-                        <Eye className="h-3 w-3 mr-1" /> Details
-                      </Button>
-                      <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        className="w-24"
-                        onClick={() => handleEditImage(composite.id)}
-                      >
-                        <Pencil className="h-3 w-3 mr-1" /> Image
-                      </Button>
-                    </div>
                   </div>
                 </div>
               </TableCell>
@@ -380,8 +652,22 @@ export default function Composites() {
                       <Download className="h-4 w-4" /> Export Composite
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive gap-2 cursor-pointer">
-                      <Trash2 className="h-4 w-4" /> Delete Case
+                    <DropdownMenuItem 
+                      className="text-destructive gap-2 cursor-pointer"
+                      onClick={() => handleDeleteComposite(composite.id)}
+                      disabled={compositeToDelete === composite.id}
+                    >
+                      {compositeToDelete === composite.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4" /> 
+                          Delete Case
+                        </>
+                      )}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -399,9 +685,34 @@ export default function Composites() {
         {composites.map((composite) => (
           <div 
             key={composite.id} 
-            className="group flex-grow basis-[300px] min-w-[300px] max-w-[400px] flex flex-col bg-card rounded-xl border hover:border-primary/20 hover:shadow-md transition-all duration-200"
+            className={cn(
+              "group relative flex-grow basis-[300px] min-w-[300px] max-w-[400px] flex flex-col bg-card rounded-xl border transition-all duration-200",
+              selectedItems.includes(composite.id) && "ring-2 ring-primary bg-accent/5",
+              "hover:bg-accent/5"
+            )}
           >
+            {/* Checkbox - Make it more visible and accessible */}
+            <div className="absolute top-3 left-3 z-20">
+              <Checkbox 
+                checked={selectedItems.includes(composite.id)}
+                onCheckedChange={() => handleSelectItem(composite.id)}
+                className={cn(
+                  "h-5 w-5 bg-background/50 backdrop-blur-sm transition-opacity cursor-pointer",
+                  "opacity-100" // Always visible
+                )}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault()
+                    handleSelectItem(composite.id)
+                  }
+                }}
+              />
+            </div>
+
+            {/* Preview Section with Hover Actions */}
             <div className="relative aspect-[3/4] rounded-t-xl bg-muted/50 overflow-hidden">
+              {/* Status Badge - Top Right */}
               <div className="absolute top-3 right-3 z-10">
                 <Badge 
                   variant={composite.status === "Active" ? "default" : "secondary"}
@@ -411,6 +722,15 @@ export default function Composites() {
                 </Badge>
               </div>
 
+              {/* ID and Case Info - Bottom Left Overlay */}
+              <div className="absolute bottom-3 left-3 z-10">
+                <div className="flex flex-col gap-1 text-xs text-white/90">
+                  <span className="font-medium">{composite.id}</span>
+                  <span>Case #{composite.caseId}</span>
+                </div>
+              </div>
+
+              {/* Preview Content */}
               <div className="absolute inset-0 flex items-center justify-center text-muted-foreground p-6">
                 <div className="text-center space-y-3">
                   <div className="relative w-24 h-32 mx-auto rounded-md bg-muted/30 flex items-center justify-center backdrop-blur-sm">
@@ -421,13 +741,20 @@ export default function Composites() {
                 </div>
               </div>
 
-              <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/50 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                <div className="flex flex-col gap-2">
+              {/* Hover Actions - Stop propagation to prevent selection */}
+              <div 
+                className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/50 to-transparent opacity-0 hover:opacity-100 transition-all duration-300 flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex flex-col gap-2 z-30">
                   <Button 
                     variant="secondary" 
                     size="sm" 
                     className="shadow-lg hover:shadow-xl transition-all w-32"
-                    onClick={() => handlePreviewClick(composite)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handlePreviewClick(composite)
+                    }}
                   >
                     <Eye className="h-4 w-4 mr-2" /> View Details
                   </Button>
@@ -435,7 +762,10 @@ export default function Composites() {
                     variant="secondary" 
                     size="sm" 
                     className="shadow-lg hover:shadow-xl transition-all w-32"
-                    onClick={() => handleEditImage(composite.id)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleEditImage(composite.id)
+                    }}
                   >
                     <Pencil className="h-4 w-4 mr-2" /> Edit Image
                   </Button>
@@ -443,194 +773,296 @@ export default function Composites() {
                     variant="secondary" 
                     size="sm" 
                     className="shadow-lg hover:shadow-xl transition-all w-32"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleExportComposite(composite.id)
+                    }}
                   >
                     <Download className="h-4 w-4 mr-2" /> Export
+                  </Button>
+                  
+                  {/* Add Separator */}
+                  <Separator className="w-24 mx-auto opacity-50" />
+                  
+                  {/* Delete Button */}
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className={cn(
+                      "shadow-lg hover:shadow-xl transition-all w-32 hover:bg-destructive hover:text-destructive-foreground",
+                      compositeToDelete === composite.id && "opacity-50 cursor-not-allowed"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteComposite(composite.id)
+                    }}
+                    disabled={compositeToDelete === composite.id}
+                  >
+                    {compositeToDelete === composite.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" /> 
+                        Delete
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
             </div>
 
             <CardContent className="p-4 flex-1 flex flex-col">
-              <div className="space-y-3 h-full flex flex-col">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-base truncate">
-                      {composite.name}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground">
-                        {composite.id}
-                      </span>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <span className="text-xs text-muted-foreground">
-                        Case #{composite.caseId}
-                      </span>
-                    </div>
-                  </div>
+              {/* Title Section */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-base truncate">
+                    {composite.name}
+                  </h3>
                 </div>
+              </div>
 
-                <p className="text-xs text-muted-foreground line-clamp-2">
+              {/* Description */}
+              <div className="mt-3 flex-1">
+                <p className="text-sm text-muted-foreground line-clamp-2">
                   {composite.description}
                 </p>
+              </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs mt-auto bg-muted/50 p-2 rounded-lg">
-                  <div className="flex items-center gap-1.5">
-                    <User className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{composite.gender}</span>
+              {/* Subject Details */}
+              <div className="mt-4 pt-3 border-t space-y-2">
+                {/* Demographics */}
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5 text-primary/70" />
+                      <span className="font-medium">{composite.gender}</span>
+                    </div>
                     <span className="text-muted-foreground">•</span>
-                    <span>{composite.ageRange}</span>
+                    <span className="text-muted-foreground">{composite.ageRange}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 justify-end">
-                    <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{composite.ethnicity}</span>
+                  <div className="flex items-center gap-1.5">
+                    <Globe className="h-3.5 w-3.5 text-primary/70" />
+                    <span className="font-medium">{composite.ethnicity}</span>
                   </div>
                 </div>
               </div>
             </CardContent>
-
-            <div className="border-t px-3 py-2 bg-muted/50">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-muted-foreground">
-                  Updated {new Date(composite.updatedAt).toLocaleDateString()}
-                </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-7 w-7"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem 
-                      className="gap-2 cursor-pointer"
-                      onClick={() => handlePreviewClick(composite)}
-                    >
-                      <Eye className="h-4 w-4" /> View Case Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      className="gap-2 cursor-pointer"
-                      onClick={() => handleEditImage(composite.id)}
-                    >
-                      <Pencil className="h-4 w-4" /> Edit Composite Image
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="gap-2 cursor-pointer">
-                      <Download className="h-4 w-4" /> Export Composite
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive gap-2 cursor-pointer">
-                      <Trash2 className="h-4 w-4" /> Delete Case
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
           </div>
         ))}
       </div>
     </div>
   )
 
-  const handlePreviewClick = (composite: typeof composites[0]) => {
-    setSelectedComposite(composite)
-    setPreviewOpen(true)
-  }
-
-  const handleEditImage = (compositeId: string) => {
-    navigate(`/composite-editor/${compositeId}`)
-  }
-
   return (
-    <div className="flex-1 space-y-6 p-8">
-      {/* Filters, Search and View Toggle */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input 
-            placeholder="Search composites..." 
-            className="pl-9" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Enhanced Action Bar */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        {/* Search and Filters Group */}
+        <div className="flex flex-1 items-center gap-2 max-w-2xl">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input 
+              placeholder="Search composites..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-full"
+            />
+          </div>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => setStatusFilter("all")}>
+                <Badge variant="outline" className="mr-2">All</Badge>
+                Show All
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter("active")}>
+                <Badge variant="default" className="mr-2">Active</Badge>
+                Active Only
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter("closed")}>
+                <Badge variant="secondary" className="mr-2">Closed</Badge>
+                Closed Only
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Select value={sortOrder} onValueChange={setSortOrder}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue>
+                <div className="flex items-center gap-2">
+                  {sortOrder === "newest" && <Clock className="h-4 w-4" />}
+                  {sortOrder === "oldest" && <Clock className="h-4 w-4 rotate-180" />}
+                  {sortOrder === "name" && <SortAsc className="h-4 w-4" />}
+                  {sortOrder === "name-desc" && <SortDesc className="h-4 w-4" />}
+                  <span>{sortOrder.charAt(0).toUpperCase() + sortOrder.slice(1)}</span>
+                </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span>Newest First</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="oldest">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 rotate-180" />
+                  <span>Oldest First</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="name">
+                <div className="flex items-center gap-2">
+                  <SortAsc className="h-4 w-4" />
+                  <span>Name (A-Z)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="name-desc">
+                <div className="flex items-center gap-2">
+                  <SortDesc className="h-4 w-4" />
+                  <span>Name (Z-A)</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Filter className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => setStatusFilter("all")}>
-              <Badge variant="outline" className="mr-2">All</Badge>
-              Show All
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setStatusFilter("active")}>
-              <Badge variant="default" className="mr-2">Active</Badge>
-              Active Only
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setStatusFilter("closed")}>
-              <Badge variant="secondary" className="mr-2">Closed</Badge>
-              Closed Only
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* View Controls and Actions */}
+        <div className="flex items-center gap-2">
+          {/* Selection Controls - Show only when items are selected */}
+          {selectedItems.length > 0 ? (
+            <div className="flex items-center gap-2 mr-2 animate-in fade-in slide-in-from-left-5">
+              <span className="text-sm text-muted-foreground">
+                {selectedItems.length} selected
+              </span>
+              <Separator orientation="vertical" className="h-6" />
+              
+              {/* Select/Deselect All Buttons */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={handleSelectAll}
+                    >
+                      <Checkbox 
+                        checked={selectedItems.length === filteredComposites.length}
+                        className="h-4 w-4"
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {selectedItems.length === filteredComposites.length ? 'Deselect all' : 'Select all'}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="flex items-center gap-2">
-              <ArrowUpDown className="h-4 w-4" />
-              {sortOrder === 'newest' && 'Newest First'}
-              {sortOrder === 'oldest' && 'Oldest First'}
-              {sortOrder === 'name' && 'Name A-Z'}
-              {sortOrder === 'name-desc' && 'Name Z-A'}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => setSortOrder('newest')}>
-              <SortDesc className="mr-2 h-4 w-4" />
-              Newest First
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setSortOrder('oldest')}>
-              <SortAsc className="mr-2 h-4 w-4" />
-              Oldest First
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setSortOrder('name')}>
-              <SortAsc className="mr-2 h-4 w-4" />
-              Name A-Z
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setSortOrder('name-desc')}>
-              <SortDesc className="mr-2 h-4 w-4" />
-              Name Z-A
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {/* Batch Actions */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={handleBatchDelete}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete selected</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-        <Separator orientation="vertical" className="h-8" />
-
-        <Button 
-          variant="outline" 
-          size="icon" 
-          onClick={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
-        >
-          {viewMode === 'list' ? (
-            <LayoutGrid className="h-4 w-4" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={handleBatchExport}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export selected</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           ) : (
-            <LayoutList className="h-4 w-4" />
+            <div className="flex items-center gap-2 mr-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={handleRefresh}
+                    >
+                      <RotateCw className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Refresh list</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           )}
-        </Button>
 
-        <Button variant="outline" size="sm">
-          <Download className="mr-2 h-4 w-4" />
-          Export
-        </Button>
+          {/* View Toggle Group */}
+          <div className="bg-muted/50 rounded-lg p-1 flex items-center gap-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setViewMode('grid')}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Grid view</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
-        <Button onClick={() => setDialogOpen(true)} className="ml-auto">
-          <Plus className="mr-2 h-4 w-4" /> New Composite
-        </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setViewMode('list')}
+                  >
+                    <LayoutList className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>List view</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
+          <Button 
+            onClick={() => setDialogOpen(true)}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            New Composite
+          </Button>
+        </div>
       </div>
 
       <NewCompositeDialog open={dialogOpen} onOpenChange={setDialogOpen} />
@@ -1082,6 +1514,602 @@ export default function Composites() {
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this composite? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              className="gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Composite
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Options</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label>File Type</label>
+              <Select
+                value={exportSettings.fileType}
+                onValueChange={(value) => setExportSettings(prev => ({ ...prev, fileType: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="png">PNG (Lossless)</SelectItem>
+                  <SelectItem value="jpg">JPG (Smaller size)</SelectItem>
+                  <SelectItem value="webp">WebP (Modern format)</SelectItem>
+                  <SelectItem value="pdf">PDF (Document)</SelectItem>
+                  <SelectItem value="psd">PSD (Adobe Photoshop)</SelectItem>
+                  <SelectItem value="ai">AI (Adobe Illustrator)</SelectItem>
+                  <SelectItem value="eps">EPS (Vector format)</SelectItem>
+                  <SelectItem value="tiff">TIFF (Print quality)</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">
+                {exportSettings.fileType === 'psd' && "Adobe Photoshop format with layers preserved"}
+                {exportSettings.fileType === 'ai' && "Adobe Illustrator vector format"}
+                {exportSettings.fileType === 'eps' && "Encapsulated PostScript for vector graphics"}
+                {exportSettings.fileType === 'tiff' && "High-quality format for print"}
+              </span>
+            </div>
+
+            {/* Show quality slider only for formats that support it */}
+            {(exportSettings.fileType === 'jpg' || exportSettings.fileType === 'webp') && (
+              <div className="grid gap-2">
+                <label>Quality</label>
+                <Slider
+                  value={[exportSettings.quality * 100]}
+                  onValueChange={([value]) => setExportSettings(prev => ({ ...prev, quality: value / 100 }))}
+                  min={1}
+                  max={100}
+                  step={1}
+                />
+                <span className="text-sm text-muted-foreground">{Math.round(exportSettings.quality * 100)}%</span>
+              </div>
+            )}
+
+            {/* Add warning for Adobe formats */}
+            {(['psd', 'ai', 'eps'].includes(exportSettings.fileType)) && (
+              <div className="bg-yellow-500/15 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-sm p-3 rounded-md">
+                {exportSettings.fileType === 'psd' && 
+                  "Note: Will export as PNG with .psd extension. Open in Photoshop for further editing."
+                }
+                {exportSettings.fileType === 'ai' && 
+                  "Note: Will export as SVG with .ai extension. Open in Illustrator for vector editing."
+                }
+                {exportSettings.fileType === 'eps' && 
+                  "Note: Will export as SVG with .eps extension. Compatible with vector editing software."
+                }
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowExportDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleExportComposite}>
+                Export
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBatchDeleteDialog} onOpenChange={setShowBatchDeleteDialog}>
+        <DialogContent className="max-w-[800px] max-h-[85vh] p-6">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Delete {selectedItems.length} Composites
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. These composites will be permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-8 overflow-hidden">
+            {/* Left Side - Selected Items */}
+            <div className="w-[300px] border-r pr-6">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-medium">Selected Items</label>
+                <Badge variant="destructive" className="font-normal">
+                  {selectedItems.length} to delete
+                </Badge>
+              </div>
+              
+              <ScrollArea className="h-[400px] -mx-2 px-2">
+                <div className="space-y-2 pr-2">
+                  {filteredComposites
+                    .filter(composite => selectedItems.includes(composite.id))
+                    .map(composite => (
+                      <div 
+                        key={composite.id} 
+                        className="group flex items-center gap-3 p-2 rounded-lg border bg-card hover:bg-destructive/50 transition-colors"
+                      >
+                        <div className="w-10 h-14 bg-muted rounded flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5 text-muted-foreground/50" />
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">
+                            {composite.name}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <span>{composite.id}</span>
+                            <span>•</span>
+                            <span>Case #{composite.caseId}</span>
+                          </div>
+                        </div>
+
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleSelectItem(composite.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+              </ScrollArea>
+
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">
+                  Tip: Click X to remove items from selection
+                </p>
+              </div>
+            </div>
+
+            {/* Right Side - Warning and Confirmation */}
+            <div className="flex-1 space-y-6">
+              <div className="space-y-4">
+                <div className="bg-destructive/10 dark:bg-destructive/5 border-l-4 border-destructive p-4 rounded-r-lg">
+                  <h4 className="font-medium text-destructive mb-2">Warning</h4>
+                  <ul className="space-y-2 text-sm text-destructive/90">
+                    <li className="flex items-start gap-2">
+                      <span className="rounded-full h-1.5 w-1.5 bg-destructive mt-1.5 shrink-0" />
+                      All selected composites will be permanently deleted
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="rounded-full h-1.5 w-1.5 bg-destructive mt-1.5 shrink-0" />
+                      Associated case data and files will also be removed
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="rounded-full h-1.5 w-1.5 bg-destructive mt-1.5 shrink-0" />
+                      This action cannot be reversed
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Confirmation</Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="confirmDelete" />
+                    <Label htmlFor="confirmDelete" className="text-sm font-normal">
+                      I understand that this action is permanent and cannot be undone
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-6 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowBatchDeleteDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              className="gap-2 min-w-[140px]"
+              onClick={handleConfirmBatchDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete {selectedItems.length} Files
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBatchExportDialog} onOpenChange={setShowBatchExportDialog}>
+        <DialogContent className="max-w-[800px] max-h-[85vh] p-6">
+          <DialogHeader className="pb-4">
+            <DialogTitle>Export {selectedItems.length} Composites</DialogTitle>
+            <DialogDescription>
+              Choose export format and configure settings
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-8 overflow-hidden">
+            {/* Left Side - Selected Items */}
+            <div className="w-[300px] border-r pr-6">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-medium">Selected Items</label>
+                <Badge variant="secondary" className="font-normal">
+                  {selectedItems.length} selected
+                </Badge>
+              </div>
+              
+              <ScrollArea className="h-[400px] -mx-2 px-2">
+                <div className="space-y-2 pr-2">
+                  {filteredComposites
+                    .filter(composite => selectedItems.includes(composite.id))
+                    .map(composite => (
+                      <div 
+                        key={composite.id} 
+                        className="group flex items-center gap-3 p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="w-10 h-14 bg-muted rounded flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5 text-muted-foreground/50" />
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">
+                            {composite.name}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <span>{composite.id}</span>
+                            <span>•</span>
+                            <span>Case #{composite.caseId}</span>
+                          </div>
+                        </div>
+
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleSelectItem(composite.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+              </ScrollArea>
+
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">
+                  Tip: Click X to remove items from selection
+                </p>
+              </div>
+            </div>
+
+            {/* Right Side - Export Settings */}
+            <div className="flex-1 space-y-6">
+              {/* Export Format Selection */}
+              <div className="space-y-4">
+                <label className="text-sm font-medium">Export Format</label>
+                <RadioGroup defaultValue="individual" className="grid grid-cols-2 gap-2">
+                  <div className="flex items-start space-x-3 space-y-0">
+                    <RadioGroupItem value="individual" id="individual" />
+                    <Label htmlFor="individual" className="font-normal">
+                      <span className="block text-sm font-medium mb-1">Individual Files</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Export each composite as a separate file
+                      </span>
+                    </Label>
+                  </div>
+                  <div className="flex items-start space-x-3 space-y-0">
+                    <RadioGroupItem value="zip" id="zip" />
+                    <Label htmlFor="zip" className="font-normal">
+                      <span className="block text-sm font-medium mb-1">ZIP Archive</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Package all files into a single ZIP
+                      </span>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <Separator />
+
+              {/* File Settings */}
+              <div className="space-y-4">
+                <label className="text-sm font-medium">File Settings</label>
+                
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label>File Type</Label>
+                    <Select
+                      value={exportSettings.fileType}
+                      onValueChange={(value) => setExportSettings(prev => ({ ...prev, fileType: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="png">PNG (Lossless)</SelectItem>
+                        <SelectItem value="jpg">JPG (Smaller size)</SelectItem>
+                        <SelectItem value="webp">WebP (Modern format)</SelectItem>
+                        <SelectItem value="pdf">PDF (Document)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(exportSettings.fileType === 'jpg' || exportSettings.fileType === 'webp') && (
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Quality</Label>
+                        <span className="text-sm text-muted-foreground">
+                          {Math.round(exportSettings.quality * 100)}%
+                        </span>
+                      </div>
+                      <Slider
+                        value={[exportSettings.quality * 100]}
+                        onValueChange={([value]) => setExportSettings(prev => ({ ...prev, quality: value / 100 }))}
+                        min={1}
+                        max={100}
+                        step={1}
+                        className="mt-2"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Additional Options */}
+              <div className="space-y-4">
+                <label className="text-sm font-medium">Additional Options</label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="includeMetadata" />
+                    <Label htmlFor="includeMetadata" className="text-sm font-normal">
+                      Include case metadata
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="includePreview" defaultChecked />
+                    <Label htmlFor="includePreview" className="text-sm font-normal">
+                      Include preview images
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Location */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Save Location</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    value="/downloads/composites/"
+                    readOnly
+                    className="flex-1 bg-muted text-sm font-mono"
+                  />
+                  <Button variant="outline" size="sm">
+                    Browse
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-6 pt-4 border-t">
+            <Button variant="outline" onClick={() => setShowBatchExportDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              className="gap-2 min-w-[140px]"
+              onClick={handleConfirmBatchExport}
+            >
+              <Download className="h-4 w-4" />
+              Export Files
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showProcessingDialog} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="h-6 w-6 animate-spin">
+                <Loader2 className="h-6 w-6" />
+              </div>
+              {isCancelling ? 'Cancelling Process' : 
+                processingStatus.total > 1 ? 'Exporting Composites' : 'Exporting Composite'
+              }
+            </DialogTitle>
+            <DialogDescription>
+              {isCancelling ? 
+                'Stopping the current operation...' :
+                `Please wait while ${processingStatus.total > 1 ? 'your files are' : 'your file is'} being exported...`
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Progress */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Progress</span>
+                <span className="text-muted-foreground">
+                  {isCancelling ? 
+                    'Cancelling...' :
+                    `${processingStatus.current} of ${processingStatus.total} files`
+                  }
+                </span>
+              </div>
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                <div 
+                  className={cn(
+                    "h-full transition-all duration-500",
+                    isCancelling ? "bg-yellow-500" : "bg-primary"
+                  )}
+                  style={{ 
+                    width: `${(processingStatus.current / processingStatus.total) * 100}%` 
+                  }} 
+                />
+              </div>
+            </div>
+
+            {/* Files List */}
+            <div className="space-y-2">
+              <ScrollArea className="h-[200px] pr-4">
+                <div className="space-y-2">
+                  {selectedItems.map(id => {
+                    const composite = filteredComposites.find(c => c.id === id)
+                    const isCompleted = processingStatus.completed.includes(id)
+                    const isProcessing = !isCompleted && 
+                      processingStatus.completed.length === selectedItems.indexOf(id)
+                    const isCancelled = isCancelling && !isCompleted
+                    
+                    return (
+                      <div 
+                        key={id}
+                        className={cn(
+                          "flex items-center gap-3 p-2 rounded-lg border bg-card transition-colors",
+                          isCompleted && "border-muted bg-muted/50",
+                          isCancelled && "border-yellow-500/20 bg-yellow-500/5"
+                        )}
+                      >
+                        {/* Status Icon */}
+                        <div className="h-5 w-5 flex items-center justify-center">
+                          {isProcessing ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          ) : isCompleted ? (
+                            <Check className="h-4 w-4 text-primary animate-in zoom-in" />
+                          ) : isCancelled ? (
+                            <X className="h-4 w-4 text-yellow-500" />
+                          ) : (
+                            <div className="h-4 w-4" />
+                          )}
+                        </div>
+
+                        {/* File Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className={cn(
+                            "text-sm truncate transition-colors",
+                            isCompleted && "text-muted-foreground",
+                            isCancelled && "text-yellow-500/80"
+                          )}>
+                            {composite?.name}
+                            {isCancelled && " (Cancelled)"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {composite?.id}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsCancelling(true)}
+              disabled={isCancelling}
+              className="gap-2"
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                'Cancel'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {operationStatus.type === 'success' && (
+                <>
+                  <Check className="h-5 w-5 text-primary" />
+                  {operationStatus.operation === 'export' ? 'Export Complete' : 'Delete Complete'}
+                </>
+              )}
+              {operationStatus.type === 'error' && (
+                <>
+                  <X className="h-5 w-5 text-destructive" />
+                  {operationStatus.operation === 'export' ? 'Export Failed' : 'Delete Failed'}
+                </>
+              )}
+              {operationStatus.type === 'cancelled' && (
+                <>
+                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                  Operation Cancelled
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {operationStatus.message}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {operationStatus.itemCount !== undefined && (
+              <div className={cn(
+                "p-4 rounded-lg",
+                operationStatus.type === 'success' && "bg-primary/10 text-primary",
+                operationStatus.type === 'error' && "bg-destructive/10 text-destructive",
+                operationStatus.type === 'cancelled' && "bg-yellow-500/10 text-yellow-500"
+              )}>
+                <div className="text-sm font-medium">Operation Summary</div>
+                <div className="text-sm mt-1">
+                  {operationStatus.type === 'success' && (
+                    `Successfully ${operationStatus.operation}ed ${operationStatus.itemCount} files`
+                  )}
+                  {operationStatus.type === 'error' && (
+                    `${operationStatus.itemCount} files were processed before the error occurred`
+                  )}
+                  {operationStatus.type === 'cancelled' && (
+                    `${operationStatus.itemCount} files were processed before cancellation`
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant={operationStatus.type === 'error' ? 'destructive' : 'default'}
+              onClick={() => setShowStatusDialog(false)}
+            >
+              {operationStatus.type === 'error' ? 'Close' : 'Done'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

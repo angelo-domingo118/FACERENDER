@@ -2084,44 +2084,76 @@ export default function CompositeEditor() {
     textureIntensity: 50
   });
 
-  // Add these handlers
-  const handleStyleChange = (style: string) => {
+  // Add new state for effect loading
+  const [isApplyingEffect, setIsApplyingEffect] = useState(false);
+
+  // Modify handleStyleChange to properly wait for effects
+  const handleStyleChange = async (style: string) => {
     console.log('Changing style to:', style);
-    setSelectedStyle(style);
     
     if (canvasRef.current) {
-      switch(style) {
-        case 'original':
-          // Reset all effects and filters
-          canvasRef.current.resetAllFilters();
-          setEffectControls({
-            effectStrength: 0,
-            lineWeight: 50,
-            textureIntensity: 50
-          });
-          break;
-          
-        case 'policeSketch':
-          // First reset any existing filters
-          canvasRef.current.resetAllFilters();
-          // Then apply police sketch effect with default values
-          setEffectControls({
-            effectStrength: 100,
-            lineWeight: 50,
-            textureIntensity: 50
-          });
-          canvasRef.current.adjustPoliceSketchEffect(100);
-          canvasRef.current.adjustLineWeight(50);
-          canvasRef.current.adjustTextureIntensity(50);
-          break;
-          
-        // ... other cases
+      if (style !== 'original') {
+        setIsApplyingEffect(true);
+        console.log('Starting effect application...');
+      }
+      
+      try {
+        setSelectedStyle(style);
+        
+        switch(style) {
+          case 'original':
+            await canvasRef.current.resetAllFilters();
+            setEffectControls({
+              effectStrength: 0,
+              lineWeight: 50,
+              textureIntensity: 50
+            });
+            break;
+            
+          case 'policeSketch':
+            // First reset filters
+            await canvasRef.current.resetAllFilters();
+            
+            setEffectControls({
+              effectStrength: 100,
+              lineWeight: 50,
+              textureIntensity: 50
+            });
+
+            // Wait for all effects to be applied
+            const applyEffects = async () => {
+              try {
+                // Apply effects sequentially
+                await canvasRef.current.adjustPoliceSketchEffect(100);
+                await canvasRef.current.adjustLineWeight(50);
+                await canvasRef.current.adjustTextureIntensity(50);
+                
+                // Add a small delay after effects are applied to ensure rendering is complete
+                await new Promise(resolve => setTimeout(resolve, 500));
+              } catch (error) {
+                console.error('Error applying effects:', error);
+                throw error; // Re-throw to be caught by outer try-catch
+              }
+            };
+
+            // Wait for all effects to complete
+            await applyEffects();
+            break;
+        }
+      } catch (error) {
+        console.error('Error applying style:', error);
+        toast.error('Failed to apply effect');
+      } finally {
+        // Add a small delay before removing loading state
+        await new Promise(resolve => setTimeout(resolve, 200));
+        console.log('Effect application complete');
+        setIsApplyingEffect(false);
       }
     }
   };
 
-  // Update handleEffectControlChange to handle debounced updates
-  const handleEffectControlChange = (key: string, value: number) => {
+  // Update handleEffectControlChange for better synchronization
+  const handleEffectControlChange = async (key: string, value: number) => {
     // Update UI immediately
     setEffectControls(prev => ({
       ...prev,
@@ -2129,28 +2161,48 @@ export default function CompositeEditor() {
     }));
     
     if (canvasRef.current) {
-      switch(selectedStyle) {
-        case 'policeSketch':
-          switch(key) {
-            case 'effectStrength':
-              // Cancel any pending debounced calls when value is 0
-              if (value === 0) {
-                canvasRef.current.resetAllFilters();
-                setSelectedStyle('original');
-              } else {
-                canvasRef.current.adjustPoliceSketchEffect(value);
-              }
-              break;
-              
-            case 'lineWeight':
-              canvasRef.current.adjustLineWeight(value);
-              break;
-              
-            case 'textureIntensity':
-              canvasRef.current.adjustTextureIntensity(value);
-              break;
-          }
-          break;
+      const shouldShowLoading = Math.abs(value - effectControls[key as keyof typeof effectControls]) > 20;
+      
+      if (shouldShowLoading) {
+        setIsApplyingEffect(true);
+      }
+      
+      try {
+        switch(selectedStyle) {
+          case 'policeSketch':
+            switch(key) {
+              case 'effectStrength':
+                if (value === 0) {
+                  await canvasRef.current.resetAllFilters();
+                  setSelectedStyle('original');
+                } else {
+                  await canvasRef.current.adjustPoliceSketchEffect(value);
+                  // Wait for effect to complete
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                break;
+                
+              case 'lineWeight':
+                await canvasRef.current.adjustLineWeight(value);
+                await new Promise(resolve => setTimeout(resolve, 200));
+                break;
+                
+              case 'textureIntensity':
+                await canvasRef.current.adjustTextureIntensity(value);
+                await new Promise(resolve => setTimeout(resolve, 200));
+                break;
+            }
+            break;
+        }
+      } catch (error) {
+        console.error('Error applying effect:', error);
+        toast.error('Failed to apply effect');
+      } finally {
+        if (shouldShowLoading) {
+          // Add a small delay before removing loading state
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setIsApplyingEffect(false);
+        }
       }
     }
   };
@@ -2449,6 +2501,32 @@ export default function CompositeEditor() {
   const [showHistoryDialog, setShowHistoryDialog] = useState(false)
 
   // ... rest of the existing code ...
+
+  // Update the LoadingEffectOverlay component
+  const LoadingEffectOverlay = () => {
+    if (!isApplyingEffect) return null;
+    
+    return (
+      <div 
+        className="fixed inset-0 z-[9999] flex items-center justify-center" 
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      >
+        <div className="bg-background/95 backdrop-blur-sm rounded-lg p-8 shadow-xl flex flex-col items-center gap-4 min-w-[300px]">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-primary/20 rounded-full animate-spin">
+              <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin" 
+                   style={{ animationDuration: '0.6s' }} 
+              />
+            </div>
+          </div>
+          <div className="text-lg font-semibold">Applying Effects</div>
+          <div className="text-sm text-muted-foreground text-center">
+            Please wait while we process your changes...
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -3270,6 +3348,9 @@ export default function CompositeEditor() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Add loading overlay */}
+      <LoadingEffectOverlay />
     </DndProvider>
   )
 } 

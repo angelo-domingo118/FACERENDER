@@ -9,7 +9,7 @@ import {
   Download, Pencil, Trash2, LayoutGrid, LayoutList,
   Clock, User, Globe, FileText, SortAsc, SortDesc,
   Eye, ZoomIn, ZoomOut, X, Check, User2, UserSquare2, Users, ClipboardCheck,
-  RotateCw, Settings, Loader2, AlertTriangle
+  RotateCw, Settings, Loader2, AlertTriangle, Pin
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -88,6 +88,7 @@ export default function Composites() {
     operation: 'export',
     message: '',
   })
+  const [pinnedItems, setPinnedItems] = useState<string[]>([]);
   
   const composites = [
     {
@@ -295,6 +296,12 @@ export default function Composites() {
     })
     // Sort
     .sort((a, b) => {
+      // First sort by pinned status
+      const isPinnedA = pinnedItems.includes(a.id);
+      const isPinnedB = pinnedItems.includes(b.id);
+      if (isPinnedA !== isPinnedB) return isPinnedB ? 1 : -1;
+      
+      // Then apply existing sort
       switch (sortOrder) {
         case "newest":
           return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -545,6 +552,15 @@ export default function Composites() {
     }
   }
 
+  const handlePinItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card selection
+    setPinnedItems(prev => 
+      prev.includes(id) 
+        ? prev.filter(item => item !== id)
+        : [...prev, id]
+    );
+  };
+
   const renderListView = (composites: typeof composites[0][]) => (
     <div className="rounded-md border">
       <Table>
@@ -712,15 +728,24 @@ export default function Composites() {
 
             {/* Preview Section with Hover Actions */}
             <div className="relative aspect-[3/4] rounded-t-xl bg-muted/50 overflow-hidden">
-              {/* Status Badge - Top Right */}
-              <div className="absolute top-3 right-3 z-10">
-                <Badge 
-                  variant={composite.status === "Active" ? "default" : "secondary"}
-                  className="shadow-sm"
-                >
-                  {composite.status}
-                </Badge>
-              </div>
+              {/* Pin Button - Top Right */}
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className={cn(
+                  "absolute top-2 right-2 z-20 h-8 w-8 transition-all",
+                  pinnedItems.includes(composite.id) 
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "hover:bg-background/20"
+                )}
+                onClick={(e) => handlePinItem(composite.id, e)}
+                aria-label={pinnedItems.includes(composite.id) ? "Unpin composite" : "Pin composite"}
+              >
+                <Pin className={cn(
+                  "h-4 w-4 transition-transform",
+                  pinnedItems.includes(composite.id) && "fill-current"
+                )} />
+              </Button>
 
               {/* ID and Case Info - Bottom Left Overlay */}
               <div className="absolute bottom-3 left-3 z-10">
@@ -728,6 +753,16 @@ export default function Composites() {
                   <span className="font-medium">{composite.id}</span>
                   <span>Case #{composite.caseId}</span>
                 </div>
+              </div>
+
+              {/* Status Badge - Bottom Right */}
+              <div className="absolute bottom-3 right-3 z-10">
+                <Badge 
+                  variant={composite.status === "Active" ? "default" : "secondary"}
+                  className="text-[10px] px-1.5 py-0"
+                >
+                  {composite.status}
+                </Badge>
               </div>
 
               {/* Preview Content */}

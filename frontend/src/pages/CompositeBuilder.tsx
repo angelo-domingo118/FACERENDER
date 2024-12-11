@@ -44,6 +44,8 @@ import {
   DotFilledIcon,
   MixerHorizontalIcon
 } from "@radix-ui/react-icons"
+import { useTheme } from "@/components/theme-provider"
+import { Moon, Sun } from "lucide-react"
 
 interface Feature {
   id: string;
@@ -93,6 +95,23 @@ const FeaturePreview = ({ feature, gridZoom }: { feature: Feature; gridZoom: num
     </div>
   );
 };
+
+const ThemeToggle = () => {
+  const { theme, setTheme } = useTheme()
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-7 w-7"
+      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+    >
+      <Sun className="h-3 w-3 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-3 w-3 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <span className="sr-only">Toggle theme</span>
+    </Button>
+  )
+}
 
 export default function CompositeBuilder() {
   const navigate = useNavigate()
@@ -546,14 +565,17 @@ export default function CompositeBuilder() {
         <div className="p-4 border-b">
           <div className="flex items-center justify-between">
             <span className="font-medium">Preview</span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-7 w-7"
-              onClick={() => setShowPreviewDialog(true)}
-            >
-              <Maximize2 className="h-3 w-3" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7"
+                onClick={() => setShowPreviewDialog(true)}
+              >
+                <Maximize2 className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
           {/* Horizontal Zoom Controls for Preview Panel */}
           <div className="mt-3 flex items-center gap-2">

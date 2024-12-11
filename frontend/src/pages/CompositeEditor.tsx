@@ -21,6 +21,18 @@ import {
   ZoomOut, ZoomIn,
   Printer,
   Brush, Eraser,
+  Loader2,
+  ArrowLeftCircle,
+  AlertTriangle,
+  Share2, 
+  History, 
+  HelpCircle, 
+  Settings2,
+  Keyboard,
+  Grid,
+  Magnet,
+  MousePointer,
+  Zap,
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { Slider } from "@/components/ui/slider"
@@ -31,7 +43,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
 import { ModeToggle } from "@/components/mode-toggle"
 import api from '@/lib/api'
 import Canvas from '@/components/Canvas/Canvas'
@@ -55,6 +66,18 @@ import jsPDF from 'jspdf';
 import { Stage, Layer, Line } from 'react-konva'
 import { NewCompositeDialog } from "@/components/dialogs/NewCompositeDialog"
 import Konva from 'konva';
+import { useNavigate } from "react-router-dom"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Switch } from "@/components/ui/switch"
 
 interface TransformSettings {
   face: {
@@ -298,6 +321,18 @@ export default function CompositeEditor() {
   const deleteLayer = (layerId: string) => {
     setLayers(prev => prev.filter(layer => layer.id !== layerId))
   }
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Your existing save logic here
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated delay
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const renderToolPanel = () => {
     if (!activeTool) return null;
@@ -2215,6 +2250,206 @@ export default function CompositeEditor() {
     }
   }, [features, layers, attributes]) // Add other dependencies that should trigger history saves
 
+  const navigate = useNavigate();
+
+  // Add new state for dialog
+  const [showExitDialog, setShowExitDialog] = useState(false);
+
+  // Add handler for exit confirmation
+  const handleExit = () => {
+    setShowExitDialog(true);
+  };
+
+  const handleExitConfirm = () => {
+    navigate('/dashboard');
+  };
+
+  const handleSaveAndExit = async () => {
+    setIsSaving(true);
+    try {
+      // Your save logic here
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated save
+      navigate('/dashboard');
+    } catch (error) {
+      toast.error("Failed to save changes");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add state for help dialog
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
+
+  // Update the Help button onClick handler
+  <Button
+    variant="ghost"
+    size="icon"
+    className="h-8 w-8"
+    onClick={() => setShowHelpDialog(true)}
+    title="Help"
+  >
+    <HelpCircle className="h-4 w-4" />
+  </Button>
+
+  // Add new state for settings
+  const [showGrid, setShowGrid] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(false);
+  const [autoSave, setAutoSave] = useState(true);
+  const [gridSize, setGridSize] = useState(20);
+
+  // Update the Settings Dropdown section
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        title="Canvas Settings"
+      >
+        <Settings2 className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="w-80">
+      <div className="p-4 space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-2 pb-2 border-b">
+          <Settings2 className="h-4 w-4 text-muted-foreground" />
+          <h4 className="font-medium">Canvas Settings</h4>
+        </div>
+
+        {/* Grid Settings */}
+        <div className="space-y-3">
+          <h5 className="text-sm font-medium text-muted-foreground">Grid</h5>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-muted">
+                  <Grid className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Show Grid</label>
+                  <p className="text-xs text-muted-foreground">Display grid lines on canvas</p>
+                </div>
+              </div>
+              <Switch
+                checked={showGrid}
+                onCheckedChange={setShowGrid}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-muted">
+                  <Magnet className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Snap to Grid</label>
+                  <p className="text-xs text-muted-foreground">Align elements to grid</p>
+                </div>
+              </div>
+              <Switch
+                checked={snapToGrid}
+                onCheckedChange={setSnapToGrid}
+                disabled={!showGrid}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm">Grid Size</label>
+                <span className="text-sm text-muted-foreground">{gridSize}px</span>
+              </div>
+              <Slider
+                value={[gridSize]}
+                onValueChange={([value]) => setGridSize(value)}
+                min={10}
+                max={50}
+                step={5}
+                disabled={!showGrid}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Canvas Behavior */}
+        <div className="space-y-3">
+          <h5 className="text-sm font-medium text-muted-foreground">Behavior</h5>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-muted">
+                  <Save className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Auto Save</label>
+                  <p className="text-xs text-muted-foreground">Save changes automatically</p>
+                </div>
+              </div>
+              <Switch
+                checked={autoSave}
+                onCheckedChange={setAutoSave}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-muted">
+                  <MousePointer className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Smooth Dragging</label>
+                  <p className="text-xs text-muted-foreground">Enable smooth drag animations</p>
+                </div>
+              </div>
+              <Switch defaultChecked />
+            </div>
+          </div>
+        </div>
+
+        {/* Performance */}
+        <div className="space-y-3">
+          <h5 className="text-sm font-medium text-muted-foreground">Performance</h5>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-muted">
+                  <Zap className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Hardware Acceleration</label>
+                  <p className="text-xs text-muted-foreground">Use GPU for better performance</p>
+                </div>
+              </div>
+              <Switch defaultChecked />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-4 border-t">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full text-xs"
+            onClick={() => {
+              setShowGrid(false);
+              setSnapToGrid(false);
+              setGridSize(20);
+              setAutoSave(true);
+            }}
+          >
+            Reset to Defaults
+          </Button>
+        </div>
+      </div>
+    </DropdownMenuContent>
+  </DropdownMenu>
+
+  // At the top with other state declarations
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false)
+
+  // ... rest of the existing code ...
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen bg-background">
@@ -2290,12 +2525,25 @@ export default function CompositeEditor() {
                       isCollapsed ? "h-8 w-8" : "h-10 w-10"
                     )}
                     title="Save"
+                    onClick={handleSave}
+                    disabled={isSaving}
                   >
-                    <Save className={cn(
-                      isCollapsed ? "h-4 w-4" : "h-5 w-5"
-                    )} />
+                    {isSaving ? (
+                      <Loader2 className={cn(
+                        isCollapsed ? "h-4 w-4" : "h-5 w-5",
+                        "animate-spin"
+                      )} />
+                    ) : (
+                      <Save className={cn(
+                        isCollapsed ? "h-4 w-4" : "h-5 w-5"
+                      )} />
+                    )}
                   </Button>
-                  {!isCollapsed && <span className="text-xs text-muted-foreground">Save</span>}
+                  {!isCollapsed && (
+                    <span className="text-xs text-muted-foreground">
+                      {isSaving ? "Saving..." : "Save"}
+                    </span>
+                  )}
                 </div>
                 <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
                   <DialogTrigger asChild>
@@ -2497,38 +2745,226 @@ export default function CompositeEditor() {
               <div className="absolute inset-0 bg-[url('/grid-dark.svg')] dark:bg-[url('/grid-light.svg')] opacity-50 dark:opacity-30" />
               
               {/* Canvas Header */}
-              <div className="absolute top-0 left-0 right-0 h-12 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 flex items-center justify-between">
-                <span className="text-sm font-medium">Canvas</span>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8"
-                    onClick={() => handleZoom(zoom - 10)}
-                  >
-                    <Minimize2 className="h-4 w-4" />
-                  </Button>
-                  <div className="flex items-center bg-muted rounded-md px-2">
-                    <Input 
-                      type="number" 
-                      value={zoom}
-                      onChange={(e) => handleZoom(Number(e.target.value))}
-                      className="h-8 w-16 text-center border-0 bg-transparent"
-                      min={100}
-                      max={300}
-                      step={10}
-                    />
-                    <span className="text-sm text-muted-foreground ml-1">%</span>
+              <div className="absolute top-0 left-0 right-0 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="h-full px-4 flex items-center justify-between">
+                  {/* Left Section */}
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={handleExit}
+                    >
+                      <ArrowLeftCircle className="h-4 w-4" />
+                      <span className="text-sm">Back</span>
+                    </Button>
+                    <Separator orientation="vertical" className="h-6" />
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Canvas</span>
+                    </div>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8"
-                    onClick={() => handleZoom(zoom + 10)}
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                  </Button>
-                  <ModeToggle />
+
+                  {/* Center Section - Canvas Controls */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center rounded-lg border bg-background/95 p-1 gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7"
+                        onClick={() => handleZoom(zoom - 10)}
+                      >
+                        <ZoomOut className="h-4 w-4" />
+                      </Button>
+                      <Input 
+                        type="number" 
+                        value={zoom}
+                        onChange={(e) => handleZoom(Number(e.target.value))}
+                        className="h-7 w-16 text-center border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        min={100}
+                        max={300}
+                        step={10}
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7"
+                        onClick={() => handleZoom(zoom + 10)}
+                      >
+                        <ZoomIn className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Right Section - Actions */}
+                  <div className="flex items-center gap-2">
+                    {/* Share button removed */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setShowHistoryDialog(true)}
+                      title="History"
+                    >
+                      <History className="h-4 w-4" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Canvas Settings"
+                        >
+                          <Settings2 className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-80">
+                        <div className="p-4 space-y-4">
+                          {/* Header */}
+                          <div className="flex items-center gap-2 pb-2 border-b">
+                            <Settings2 className="h-4 w-4 text-muted-foreground" />
+                            <h4 className="font-medium">Canvas Settings</h4>
+                          </div>
+
+                          {/* Grid Settings */}
+                          <div className="space-y-3">
+                            <h5 className="text-sm font-medium text-muted-foreground">Grid</h5>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 rounded-md bg-muted">
+                                    <Grid className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium">Show Grid</label>
+                                    <p className="text-xs text-muted-foreground">Display grid lines on canvas</p>
+                                  </div>
+                                </div>
+                                <Switch
+                                  checked={showGrid}
+                                  onCheckedChange={setShowGrid}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 rounded-md bg-muted">
+                                    <Magnet className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium">Snap to Grid</label>
+                                    <p className="text-xs text-muted-foreground">Align elements to grid</p>
+                                  </div>
+                                </div>
+                                <Switch
+                                  checked={snapToGrid}
+                                  onCheckedChange={setSnapToGrid}
+                                  disabled={!showGrid}
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-sm">Grid Size</label>
+                                  <span className="text-sm text-muted-foreground">{gridSize}px</span>
+                                </div>
+                                <Slider
+                                  value={[gridSize]}
+                                  onValueChange={([value]) => setGridSize(value)}
+                                  min={10}
+                                  max={50}
+                                  step={5}
+                                  disabled={!showGrid}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Canvas Behavior */}
+                          <div className="space-y-3">
+                            <h5 className="text-sm font-medium text-muted-foreground">Behavior</h5>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 rounded-md bg-muted">
+                                    <Save className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium">Auto Save</label>
+                                    <p className="text-xs text-muted-foreground">Save changes automatically</p>
+                                  </div>
+                                </div>
+                                <Switch
+                                  checked={autoSave}
+                                  onCheckedChange={setAutoSave}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 rounded-md bg-muted">
+                                    <MousePointer className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium">Smooth Dragging</label>
+                                    <p className="text-xs text-muted-foreground">Enable smooth drag animations</p>
+                                  </div>
+                                </div>
+                                <Switch defaultChecked />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Performance */}
+                          <div className="space-y-3">
+                            <h5 className="text-sm font-medium text-muted-foreground">Performance</h5>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 rounded-md bg-muted">
+                                    <Zap className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium">Hardware Acceleration</label>
+                                    <p className="text-xs text-muted-foreground">Use GPU for better performance</p>
+                                  </div>
+                                </div>
+                                <Switch defaultChecked />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Footer */}
+                          <div className="pt-4 border-t">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full text-xs"
+                              onClick={() => {
+                                setShowGrid(false);
+                                setSnapToGrid(false);
+                                setGridSize(20);
+                                setAutoSave(true);
+                              }}
+                            >
+                              Reset to Defaults
+                            </Button>
+                          </div>
+                        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Separator orientation="vertical" className="h-6" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setShowHelpDialog(true)}
+                      title="Help"
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                    </Button>
+                    <ModeToggle />
+                  </div>
                 </div>
               </div>
 
@@ -2560,11 +2996,280 @@ export default function CompositeEditor() {
           {renderToolPanel()}
         </div>
       </div>
+
+      {/* All dialogs should be here at the end */}
       <NewCompositeDialog 
         open={showNewDialog}
         onOpenChange={setShowNewDialog}
         onSubmit={handleNewComposite}
       />
+
+      <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <AlertDialogContent className="max-w-[360px] p-5">
+          <AlertDialogHeader className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-full bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+              </div>
+              <AlertDialogTitle className="text-lg">Exit Editor?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-sm text-muted-foreground">
+              You have unsaved changes in your composite.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex flex-col gap-2 py-4">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer" onClick={handleSaveAndExit}>
+              <div className="p-1.5 rounded-full bg-primary/10">
+                <Save className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <div className="space-y-0.5">
+                <h4 className="text-sm font-medium">Save & exit</h4>
+                <p className="text-xs text-muted-foreground">
+                  Save your current work before exiting
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer" onClick={handleExitConfirm}>
+              <div className="p-1.5 rounded-full bg-amber-500/10">
+                <X className="h-3.5 w-3.5 text-amber-500" />
+              </div>
+              <div className="space-y-0.5">
+                <h4 className="text-sm font-medium">Exit without saving</h4>
+                <p className="text-xs text-muted-foreground">
+                  All unsaved changes will be lost
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowExitDialog(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add Help Dialog here */}
+      <Dialog open={showHelpDialog} onOpenChange={setShowHelpDialog}>
+        <DialogContent className="max-w-[800px] h-[600px] p-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle className="text-xl">Help Center</DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex h-[calc(100%-60px)]">
+            {/* Sidebar */}
+            <div className="w-[240px] border-r p-4 space-y-1">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-2"
+                size="sm"
+              >
+                <Layers className="h-4 w-4" />
+                <span>Getting Started</span>
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-2"
+                size="sm"
+              >
+                <ImageIcon className="h-4 w-4" />
+                <span>Features & Tools</span>
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-2"
+                size="sm"
+              >
+                <Sliders className="h-4 w-4" />
+                <span>Adjustments</span>
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-2"
+                size="sm"
+              >
+                <Brush className="h-4 w-4" />
+                <span>Artistic Effects</span>
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-2"
+                size="sm"
+              >
+                <Keyboard className="h-4 w-4" />
+                <span>Keyboard Shortcuts</span>
+              </Button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-auto">
+              <ScrollArea className="h-full">
+                <div className="p-6 space-y-6">
+                  {/* Quick Start Section */}
+                  <div className="space-y-4">
+                    <h2 className="text-lg font-semibold">Quick Start Guide</h2>
+                    <div className="grid gap-4">
+                      <div className="flex items-start gap-3 p-4 rounded-lg border bg-muted/50">
+                        <div className="p-2 rounded-full bg-primary/10">
+                          <CircleUser className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium mb-1">1. Select Face Shape</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Start by choosing a base face shape from the Feature Selection panel
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 p-4 rounded-lg border bg-muted/50">
+                        <div className="p-2 rounded-full bg-primary/10">
+                          <Eye className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium mb-1">2. Add Facial Features</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Add eyes, nose, mouth, and other features to build the composite
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 p-4 rounded-lg border bg-muted/50">
+                        <div className="p-2 rounded-full bg-primary/10">
+                          <Sliders className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium mb-1">3. Adjust & Refine</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Fine-tune positions, sizes, and apply artistic effects
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Keyboard Shortcuts Section */}
+                  <div className="space-y-4">
+                    <h2 className="text-lg font-semibold">Common Shortcuts</h2>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Undo</span>
+                          <kbd className="px-2 py-1 rounded bg-muted">⌘ Z</kbd>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Redo</span>
+                          <kbd className="px-2 py-1 rounded bg-muted">⌘ ⇧ Z</kbd>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Save</span>
+                          <kbd className="px-2 py-1 rounded bg-muted">⌘ S</kbd>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Zoom In</span>
+                          <kbd className="px-2 py-1 rounded bg-muted">⌘ +</kbd>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Zoom Out</span>
+                          <kbd className="px-2 py-1 rounded bg-muted">⌘ -</kbd>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Reset Zoom</span>
+                          <kbd className="px-2 py-1 rounded bg-muted">⌘ 0</kbd>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+        <DialogContent className="max-w-[400px] p-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <History className="h-5 w-5" />
+              History
+            </DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="h-[500px]">
+            <div className="p-6">
+              <div className="space-y-6">
+                {/* Current State */}
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-3 rounded-full bg-primary"></div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Current State</span>
+                      <span className="text-xs text-muted-foreground">Just now</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timeline line */}
+                <div className="ml-[5px] border-l-2 border-dashed border-muted-foreground/20 space-y-6">
+                  {/* Example history items */}
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="relative pl-8">
+                      <div className="absolute left-[-5px] h-2.5 w-2.5 rounded-full border-2 border-muted bg-background"></div>
+                      <div className="flex items-start justify-between gap-2 rounded-lg border p-3 bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Feature Modified</p>
+                          <p className="text-xs text-muted-foreground">Adjusted nose position</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">2m ago</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Footer with info */}
+              <div className="mt-6 pt-4 border-t">
+                <p className="text-xs text-muted-foreground">
+                  Click on any history state to preview. Press restore to revert to that state.
+                </p>
+              </div>
+            </div>
+          </ScrollArea>
+
+          <div className="p-4 border-t bg-muted/50">
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1"
+                onClick={() => setShowHistoryDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  // Restore functionality would go here
+                  setShowHistoryDialog(false)
+                }}
+              >
+                Restore Selected
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DndProvider>
   )
 } 

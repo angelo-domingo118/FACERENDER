@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { 
   ChevronLeft, ChevronRight, 
@@ -36,6 +36,14 @@ import axios from 'axios'
 import { useToast } from "@/hooks/use-toast"
 import PreviewCanvas from '@/components/Canvas/PreviewCanvas'
 import { analyzeSkinTone, blendFeatures } from '@/lib/colorMatching';
+import { 
+  FaceIcon, 
+  EyeOpenIcon, 
+  PersonIcon,
+  Cross2Icon,
+  DotFilledIcon,
+  MixerHorizontalIcon
+} from "@radix-ui/react-icons"
 
 interface Feature {
   id: string;
@@ -45,6 +53,15 @@ interface Feature {
 }
 
 type FeatureCategory = 'faceShape' | 'nose' | 'mouth' | 'eyes' | 'eyebrows' | 'ears';
+
+interface SelectedFeatureIds {
+  faceShape?: string;
+  eyes?: string;
+  eyebrows?: string;
+  nose?: string;
+  mouth?: string;
+  ears?: string;
+}
 
 const FeaturePreview = ({ feature, gridZoom }: { feature: Feature; gridZoom: number }) => {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -80,7 +97,7 @@ const FeaturePreview = ({ feature, gridZoom }: { feature: Feature; gridZoom: num
 export default function CompositeBuilder() {
   const navigate = useNavigate()
   const [currentFeature, setCurrentFeature] = useState<FeatureCategory>('faceShape')
-  const [zoom, setZoom] = useState(300)
+  const [zoom, setZoom] = useState(250)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [progress, setProgress] = useState(0)
   const [selectedFeatures, setSelectedFeatures] = useState<Record<FeatureCategory, boolean>>({
@@ -99,6 +116,11 @@ export default function CompositeBuilder() {
   const { toast } = useToast()
   const [previewFeatures, setPreviewFeatures] = useState<Feature[]>([])
   const [gridZoom, setGridZoom] = useState(150)
+  const [dialogSize, setDialogSize] = useState({ width: 0, height: 0 });
+  const previewContentRef = useRef<HTMLDivElement>(null);
+  const [selectedFeatureIds, setSelectedFeatureIds] = useState<SelectedFeatureIds>({});
+  const [showExitDialog, setShowExitDialog] = useState(false)
+  const [showSaveDraftDialog, setShowSaveDraftDialog] = useState(false)
 
   const placeholderFeatures = Array(9).fill(null)
   const featureCategories: FeatureCategory[] = [
@@ -109,6 +131,15 @@ export default function CompositeBuilder() {
     'mouth', 
     'ears'
   ];
+
+  const featureIcons: Record<string, React.ReactNode> = {
+    faceShape: <FaceIcon className="h-4 w-4" />,
+    eyes: <EyeOpenIcon className="h-4 w-4" />,
+    eyebrows: <MixerHorizontalIcon className="h-4 w-4" />,
+    nose: <DotFilledIcon className="h-4 w-4" />,
+    mouth: <Cross2Icon className="h-4 w-4 rotate-45" />,
+    ears: <PersonIcon className="h-4 w-4" />
+  };
 
   useEffect(() => {
     const fetchFeatures = async () => {
@@ -146,9 +177,9 @@ export default function CompositeBuilder() {
 
   // Calculate progress based on selected features
   const calculateProgress = () => {
-    // This is a placeholder - implement actual progress calculation
-    return 60
-  }
+    const selectedCount = Object.values(selectedFeatures).filter(Boolean).length;
+    return (selectedCount / featureCategories.length) * 100;
+  };
 
   const handleFinish = () => {
     console.log('Navigating to editor with features:', previewFeatures)
@@ -163,6 +194,11 @@ export default function CompositeBuilder() {
   const handleFeatureSelect = async (feature: Feature) => {
     console.log('Feature selected:', { feature, currentFeature });
     
+    setSelectedFeatureIds(prev => ({
+      ...prev,
+      [currentFeature]: feature.id
+    }));
+
     setSelectedFeatures(prev => ({
       ...prev,
       [currentFeature]: true
@@ -264,17 +300,40 @@ export default function CompositeBuilder() {
       return
     }
 
-    // Show confirmation only if there are changes
-    const confirmed = window.confirm("Are you sure you want to exit? Any unsaved changes will be lost.")
-    if (confirmed) {
-      navigate('/dashboard')
-    }
-  }, [selectedFeatures, navigate])
+    setShowExitDialog(true)
+  }, [selectedFeatures])
+
+  useEffect(() => {
+    if (!previewContentRef.current) return;
+
+    const updateSize = () => {
+      const element = previewContentRef.current;
+      if (element) {
+        setDialogSize({
+          width: element.clientWidth,
+          height: element.clientHeight
+        });
+      }
+    };
+
+    // Initial size
+    updateSize();
+
+    // Create resize observer
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(previewContentRef.current);
+
+    return () => {
+      if (previewContentRef.current) {
+        resizeObserver.unobserve(previewContentRef.current);
+      }
+    };
+  }, [showPreviewDialog]);
 
   return (
     <div className="h-screen flex bg-background">
       {/* Left Panel - Fixed width */}
-      <div className="w-80 flex-shrink-0 border-r bg-muted/5 flex flex-col">
+      <div className="w-64 flex-shrink-0 border-r bg-muted/5 flex flex-col">
         {/* Header */}
         <div className="p-4 border-b">
           <div className="flex items-center gap-2">
@@ -291,27 +350,50 @@ export default function CompositeBuilder() {
 
         {/* Feature Categories */}
         <ScrollArea className="flex-1">
-          <div className="p-4 space-y-2">
+          <div className="p-3 space-y-1">
+            <div className="mb-4">
+              <h2 className="px-2 mb-2 text-lg font-semibold tracking-tight">
+                Features
+              </h2>
+              <p className="px-2 text-sm text-muted-foreground mb-4">
+                Select features to build your composite
+              </p>
+              <Progress value={calculateProgress()} className="h-2 mb-2" />
+              <p className="px-2 text-xs text-muted-foreground">
+                {Object.values(selectedFeatures).filter(Boolean).length} of {featureCategories.length} features selected
+              </p>
+            </div>
+
             {featureCategories.map((feature) => (
               <Button
                 key={feature}
-                variant="ghost"
+                variant={currentFeature === feature ? "secondary" : "ghost"}
                 className={cn(
-                  "w-full justify-start",
-                  currentFeature === feature 
-                    ? "bg-accent text-accent-foreground" 
-                    : "text-foreground hover:text-foreground hover:bg-accent"
+                  "w-full justify-between px-2 py-4 h-auto",
+                  currentFeature === feature && "bg-accent",
+                  !selectedFeatures[feature] && "text-muted-foreground"
                 )}
                 onClick={() => setCurrentFeature(feature)}
               >
-                <div className="flex items-center w-full gap-2">
-                  <div className="w-4 h-4 flex items-center justify-center">
-                    {selectedFeatures[feature] && (
-                      <Check className="h-3.5 w-3.5 text-primary" />
-                    )}
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-8 h-8 rounded-md flex items-center justify-center",
+                    currentFeature === feature ? "bg-primary/10" : "bg-muted",
+                  )}>
+                    {featureIcons[feature]}
                   </div>
-                  <span className="select-none">{getCategoryDisplay(feature)}</span>
+                  <div className="flex flex-col items-start">
+                    <span className="text-sm font-medium">
+                      {getCategoryDisplay(feature)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {selectedFeatures[feature] ? "Selected" : "Not selected"}
+                    </span>
+                  </div>
                 </div>
+                {selectedFeatures[feature] && (
+                  <CheckCircle className="h-4 w-4 text-primary shrink-0" />
+                )}
               </Button>
             ))}
           </div>
@@ -322,7 +404,7 @@ export default function CompositeBuilder() {
           <Button
             variant="outline"
             className="w-full justify-start"
-            onClick={handleSaveDraft}
+            onClick={() => setShowSaveDraftDialog(true)}
           >
             <Save className="h-4 w-4 mr-2" />
             Save Draft
@@ -331,7 +413,7 @@ export default function CompositeBuilder() {
           <Button
             variant="outline"
             className="w-full justify-start"
-            onClick={handleExit}
+            onClick={() => setShowExitDialog(true)}
           >
             <X className="h-4 w-4 mr-2" />
             Exit
@@ -414,24 +496,16 @@ export default function CompositeBuilder() {
                       className={cn(
                         "relative rounded-lg bg-muted/50 border-2 transition-all cursor-pointer overflow-hidden",
                         "hover:border-primary/50 hover:bg-muted/70",
-                        selectedFeatureId === feature.id ? "border-primary" : "border-transparent"
+                        selectedFeatureIds[currentFeature] === feature.id ? "border-primary" : "border-transparent"
                       )}
                       style={{ aspectRatio: '1' }}
-                      onClick={() => {
-                        setSelectedFeatureId(feature.id);
-                        handleFeatureSelect({
-                          id: feature.id,
-                          url: feature.url,
-                          category: currentFeature,
-                          type: feature.type
-                        });
-                      }}
+                      onClick={() => handleFeatureSelect(feature)}
                     >
                       <FeaturePreview 
                         feature={feature} 
                         gridZoom={gridZoom} 
                       />
-                      {selectedFeatureId === feature.id && (
+                      {selectedFeatureIds[currentFeature] === feature.id && (
                         <div className="absolute top-2 right-2 z-10">
                           <div className="bg-primary text-primary-foreground rounded-full p-1">
                             <Check className="h-3 w-3" />
@@ -468,7 +542,7 @@ export default function CompositeBuilder() {
       </div>
 
       {/* Right Panel - Fixed width */}
-      <div className="w-80 flex-shrink-0 border-l bg-muted/5 flex flex-col">
+      <div className="w-96 flex-shrink-0 border-l bg-muted/5 flex flex-col">
         <div className="p-4 border-b">
           <div className="flex items-center justify-between">
             <span className="font-medium">Preview</span>
@@ -496,7 +570,7 @@ export default function CompositeBuilder() {
                 type="number" 
                 value={zoom}
                 onChange={(e) => setZoom(Math.min(900, Math.max(75, Number(e.target.value))))}
-                className="h-7 text-center border-0 bg-transparent text-sm"
+                className="h-7 text-center border-0 bg-transparent text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 min={75}
                 max={900}
                 step={30}
@@ -515,14 +589,17 @@ export default function CompositeBuilder() {
         </div>
 
         <div className="flex-1 p-4">
-          <div className="h-full rounded-lg border-2 border-dashed border-muted bg-muted/5 overflow-hidden">
+          <div className="h-full rounded-lg border-2 border-dashed border-muted bg-muted/5 overflow-hidden relative">
             {previewFeatures.length > 0 ? (
-              <PreviewCanvas
-                width={300}
-                height={400}
-                features={previewFeatures}
-                zoom={zoom}
-              />
+              <div className="w-full h-full flex items-center justify-center">
+                <PreviewCanvas
+                  width={384}
+                  height={512}
+                  features={previewFeatures}
+                  zoom={zoom}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <span className="text-sm text-muted-foreground">
@@ -537,53 +614,55 @@ export default function CompositeBuilder() {
       {/* Preview Dialog */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-background rounded-lg border shadow-lg overflow-hidden">
-          {/* Header with title */}
+          {/* Header with title and zoom controls */}
           <div className="border-b p-4">
             <div className="flex items-center justify-between">
-              <DialogTitle>Preview</DialogTitle>
+              <DialogTitle className="w-24">Preview</DialogTitle>
+              <div className="flex-1 flex items-center justify-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-8 w-8"
+                  onClick={() => setZoom(Math.max(75, zoom - 30))}
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center bg-muted rounded-md px-2">
+                  <Input 
+                    type="number" 
+                    value={zoom}
+                    onChange={(e) => setZoom(Math.min(900, Math.max(75, Number(e.target.value))))}
+                    className="h-8 w-16 text-center border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    min={75}
+                    max={900}
+                    step={30}
+                  />
+                  <span className="text-sm text-muted-foreground ml-1">%</span>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-8 w-8"
+                  onClick={() => setZoom(Math.min(900, zoom + 30))}
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="w-24"></div> {/* Spacer for centering */}
             </div>
           </div>
 
           {/* Preview Content */}
-          <div className="w-full h-[calc(90vh-80px)] overflow-hidden relative">
-            {/* Centered Zoom Controls */}
-            <div className="absolute left-1/2 bottom-6 -translate-x-1/2 z-10 flex items-center gap-2 bg-background/95 p-2 rounded-lg border shadow-lg">
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => setZoom(Math.max(75, zoom - 30))}
-              >
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center bg-muted rounded-md px-2">
-                <Input 
-                  type="number" 
-                  value={zoom}
-                  onChange={(e) => setZoom(Math.min(900, Math.max(75, Number(e.target.value))))}
-                  className="h-8 w-16 text-center border-0 bg-transparent"
-                  min={75}
-                  max={900}
-                  step={30}
-                />
-                <span className="text-sm text-muted-foreground ml-1">%</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => setZoom(Math.min(900, zoom + 30))}
-              >
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-            </div>
-
+          <div 
+            ref={previewContentRef}
+            className="w-full h-[calc(90vh-80px)] overflow-hidden relative"
+          >
             {/* Canvas */}
             <div className="h-full">
               {previewFeatures.length > 0 ? (
                 <PreviewCanvas
-                  width={window.innerWidth * 0.9}
-                  height={window.innerHeight * 0.9 - 80}
+                  width={dialogSize.width}
+                  height={dialogSize.height}
                   features={previewFeatures}
                   zoom={zoom}
                 />
@@ -612,6 +691,53 @@ export default function CompositeBuilder() {
             <AlertDialogCancel>Stay Here</AlertDialogCancel>
             <AlertDialogAction onClick={handleFinish}>
               Continue to Editor
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Exit Dialog */}
+      <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Exit Composite Builder</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to exit? Any unsaved changes will be lost and cannot be recovered.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              variant="destructive"
+              onClick={() => {
+                setShowExitDialog(false)
+                navigate('/dashboard')
+              }}
+            >
+              Exit Without Saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Save Draft Dialog */}
+      <AlertDialog open={showSaveDraftDialog} onOpenChange={setShowSaveDraftDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save Draft</AlertDialogTitle>
+            <AlertDialogDescription>
+              Do you want to save your current progress as a draft? You can continue working on it later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                handleSaveDraft();
+                setShowSaveDraftDialog(false);
+              }}
+            >
+              Save Draft
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -8,7 +8,7 @@ interface Feature {
   category: string;
 }
 
-export default function PreviewCanvas({ width, height, features, zoom = 100 }) {
+export default function PreviewCanvas({ width, height, features, zoom = 250 }) {
   const [images, setImages] = useState<Record<string, HTMLImageElement>>({});
   const [stageScale, setStageScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -43,8 +43,13 @@ export default function PreviewCanvas({ width, height, features, zoom = 100 }) {
   }, [features]);
 
   useEffect(() => {
-    setStageScale(zoom / 100);
-  }, [zoom]);
+    if (width && height) {
+      setPosition({ x: 0, y: 0 });
+      setStageScale(zoom / 100);
+    }
+  }, [width, height, zoom]);
+
+  if (!width || !height) return null;
 
   return (
     <Stage 

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { useNavigate } from "react-router-dom"
-import { ChevronRight, ChevronLeft } from "lucide-react"
+import { ChevronRight, ChevronLeft, Info } from "lucide-react"
 
 // Add proper type definitions for props
 interface NewCompositeDialogProps {
@@ -68,6 +68,14 @@ interface FormData {
 
 type Section = 'operator' | 'witness' | 'incident-1' | 'incident-2' | 'verification'
 
+const MOCK_CURRENT_OPERATOR = {
+  rank: "po1",
+  badgeNumber: "PNP-2024-123",
+  firstName: "Juan",
+  lastName: "Dela Cruz",
+  unit: "Criminal Investigation Unit"
+}
+
 export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewCompositeDialogProps) {
   const navigate = useNavigate()
 
@@ -109,6 +117,21 @@ export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewComposit
   })
 
   const [currentSection, setCurrentSection] = useState<Section>('operator')
+
+  useEffect(() => {
+    if (open) {
+      console.log("Auto-filling operator details...")
+      // Auto-fill operator details from mock data
+      setFormData(prev => ({
+        ...prev,
+        operatorRank: MOCK_CURRENT_OPERATOR.rank,
+        operatorBadgeNumber: MOCK_CURRENT_OPERATOR.badgeNumber,
+        operatorFirstName: MOCK_CURRENT_OPERATOR.firstName,
+        operatorLastName: MOCK_CURRENT_OPERATOR.lastName,
+        operatorUnit: MOCK_CURRENT_OPERATOR.unit
+      }))
+    }
+  }, [open])
 
   const getSectionTitle = (section: Section) => {
     switch(section) {
@@ -278,57 +301,49 @@ export function NewCompositeDialog({ open, onOpenChange, onSubmit }: NewComposit
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Rank</Label>
-                <Select 
+                <Input 
                   value={formData.operatorRank}
-                  onValueChange={(value) => setFormData({...formData, operatorRank: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select rank" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="po1">PO1</SelectItem>
-                    <SelectItem value="po2">PO2</SelectItem>
-                    <SelectItem value="po3">PO3</SelectItem>
-                    <SelectItem value="spo1">SPO1</SelectItem>
-                    <SelectItem value="spo2">SPO2</SelectItem>
-                    <SelectItem value="spo3">SPO3</SelectItem>
-                    <SelectItem value="spo4">SPO4</SelectItem>
-                    <SelectItem value="inspector">Inspector</SelectItem>
-                    <SelectItem value="superintendent">Superintendent</SelectItem>
-                  </SelectContent>
-                </Select>
+                  className="bg-muted"
+                  readOnly
+                />
               </div>
               <div>
                 <Label>Badge Number</Label>
                 <Input 
-                  placeholder="Enter badge number"
                   value={formData.operatorBadgeNumber}
-                  onChange={(e) => setFormData({...formData, operatorBadgeNumber: e.target.value})}
+                  className="bg-muted"
+                  readOnly
                 />
               </div>
               <div>
                 <Label>First Name</Label>
                 <Input 
-                  placeholder="Enter first name"
                   value={formData.operatorFirstName}
-                  onChange={(e) => setFormData({...formData, operatorFirstName: e.target.value})}
+                  className="bg-muted"
+                  readOnly
                 />
               </div>
               <div>
                 <Label>Last Name</Label>
                 <Input 
-                  placeholder="Enter last name"
                   value={formData.operatorLastName}
-                  onChange={(e) => setFormData({...formData, operatorLastName: e.target.value})}
+                  className="bg-muted"
+                  readOnly
                 />
               </div>
               <div className="col-span-2">
                 <Label>Unit/Station</Label>
                 <Input 
-                  placeholder="Enter unit or station"
                   value={formData.operatorUnit}
-                  onChange={(e) => setFormData({...formData, operatorUnit: e.target.value})}
+                  className="bg-muted"
+                  readOnly
                 />
+              </div>
+              <div className="col-span-2 p-3 rounded-lg bg-blue-500/10 text-blue-500 text-sm">
+                <div className="flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  <span>Operator details are automatically filled based on your account</span>
+                </div>
               </div>
             </div>
           )}

@@ -1831,15 +1831,21 @@ export default function CompositeEditor() {
     canvasRef.current.flipFeature(featureType, direction);
   };
 
+  // Add new state for attributes loading
+  const [isApplyingAttributes, setIsApplyingAttributes] = useState(false);
+
+  // Update handleSkinToneChange
   const handleSkinToneChange = async (value: number) => {
     console.log('handleSkinToneChange called:', { value });
     
-    setAttributes(prev => ({
-      ...prev,
-      skinTone: value
-    }));
-
+    setIsApplyingAttributes(true);
+    
     try {
+      setAttributes(prev => ({
+        ...prev,
+        skinTone: value
+      }));
+
       if (!canvasRef.current) {
         console.log('Canvas ref is null');
         return;
@@ -1874,43 +1880,88 @@ export default function CompositeEditor() {
       console.log('Skin analysis result:', skinAnalysis);
       
       console.log('Applying skin tone adjustment...');
-      canvasRef.current.adjustSkinTone(value, skinAnalysis);
+      await canvasRef.current.adjustSkinTone(value, skinAnalysis);
+      
+      // Add small delay to ensure changes are rendered
+      await new Promise(resolve => setTimeout(resolve, 200));
 
     } catch (error) {
       console.error('Error in handleSkinToneChange:', error);
-      toast({
-        title: "Error adjusting skin tone",
-        description: error instanceof Error ? error.message : "Failed to apply skin tone adjustment",
-        variant: "destructive"
-      });
+      toast.error('Failed to adjust skin tone');
+    } finally {
+      setIsApplyingAttributes(false);
     }
   };
 
-  const handleContrastChange = (value: number) => {
+  // Update handleContrastChange
+  const handleContrastChange = async (value: number) => {
     console.log('Handling contrast change:', value);
-    setAttributes(prev => ({
-      ...prev,
-      contrast: value
-    }));
+    setIsApplyingAttributes(true);
+    
+    try {
+      setAttributes(prev => ({
+        ...prev,
+        contrast: value
+      }));
 
-    if (canvasRef.current) {
-      canvasRef.current.adjustContrast(value);
+      if (canvasRef.current) {
+        await canvasRef.current.adjustContrast(value);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    } catch (error) {
+      console.error('Error adjusting contrast:', error);
+      toast.error('Failed to adjust contrast');
+    } finally {
+      setIsApplyingAttributes(false);
     }
   };
 
-  const debouncedSharpnessChange = debounce((value: number) => {
-    if (canvasRef.current) {
-      canvasRef.current.adjustSharpness(value);
-    }
-  }, 16); // Debounce to roughly match 60fps
-
-  const handleSharpnessChange = (value: number) => {
-    setAttributes(prev => ({
-      ...prev,
-      sharpness: value
-    }));
+  // Update handleSharpnessChange
+  const handleSharpnessChange = async (value: number) => {
+    setIsApplyingAttributes(true);
     
-    debouncedSharpnessChange(value);
+    try {
+      setAttributes(prev => ({
+        ...prev,
+        sharpness: value
+      }));
+      
+      if (canvasRef.current) {
+        await canvasRef.current.adjustSharpness(value);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    } catch (error) {
+      console.error('Error adjusting sharpness:', error);
+      toast.error('Failed to adjust sharpness');
+    } finally {
+      setIsApplyingAttributes(false);
+    }
+  };
+
+  // Add AttributesLoadingOverlay component
+  const AttributesLoadingOverlay = () => {
+    if (!isApplyingAttributes) return null;
+    
+    return (
+      <div 
+        className="fixed inset-0 z-[9999] flex items-center justify-center" 
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      >
+        <div className="bg-background/95 backdrop-blur-sm rounded-lg p-8 shadow-xl flex flex-col items-center gap-4 min-w-[300px]">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-primary/20 rounded-full animate-spin">
+              <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin" 
+                   style={{ animationDuration: '0.6s' }} 
+              />
+            </div>
+          </div>
+          <div className="text-lg font-semibold">Adjusting Attributes</div>
+          <div className="text-sm text-muted-foreground text-center">
+            Please wait while we process your changes...
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -3351,6 +3402,7 @@ export default function CompositeEditor() {
 
       {/* Add loading overlay */}
       <LoadingEffectOverlay />
+      <AttributesLoadingOverlay />
     </DndProvider>
   )
 } 

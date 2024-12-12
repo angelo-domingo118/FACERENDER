@@ -117,6 +117,7 @@ interface CanvasRef {
   adjustPoliceSketchEffect: (value: number) => void;
   adjustLineWeight: (value: number) => void;
   adjustTextureIntensity: (value: number) => void;
+  adjustSkinTone: (value: number, analysis: any, feature?: string) => Promise<void>;
 }
 
 interface CompositeState {
@@ -181,6 +182,16 @@ interface ExportSettings {
   fileType: string;
   quality: number;
 }
+
+// Add these color constants at the top of your component
+const SKIN_TONE_COLORS = [
+  '#FFDFC4', // Very light
+  '#F0C8A0', // Light
+  '#DEB887', // Medium light
+  '#C69C6D', // Medium
+  '#A67B5B', // Medium dark
+  '#8B4513', // Dark
+];
 
 export default function CompositeEditor() {
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -530,56 +541,271 @@ export default function CompositeEditor() {
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-6">
-                {[
-                  { 
-                    key: 'skinTone', 
-                    label: 'Skin Tone',
-                    description: 'Adjust overall skin color',
-                    onChange: handleSkinToneChange 
-                  },
-                  { 
-                    key: 'contrast', 
-                    label: 'Contrast',
-                    description: 'Enhance feature definition',
-                    onChange: handleContrastChange 
-                  },
-                  { 
-                    key: 'sharpness', 
-                    label: 'Sharpness',
-                    description: 'Control feature clarity',
-                    onChange: handleSharpnessChange
-                  }
-                ].map((attr) => (
-                  <div key={attr.key} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-sm">{attr.label}</span>
-                        <p className="text-xs text-muted-foreground">{attr.description}</p>
+                {/* Feature Selection for Attributes */}
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Apply to:</span>
+                  <Select
+                    value={selectedAttributeFeature}
+                    onValueChange={(value: typeof selectedAttributeFeature) => 
+                      setSelectedAttributeFeature(value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select feature" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Features</SelectItem>
+                      <SelectItem value="face">Face</SelectItem>
+                      <SelectItem value="eyes">Eyes</SelectItem>
+                      <SelectItem value="eyebrows">Eyebrows</SelectItem>
+                      <SelectItem value="nose">Nose</SelectItem>
+                      <SelectItem value="mouth">Mouth</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Attributes Controls */}
+                <div className="space-y-4">
+                  {[
+                    {
+                      key: 'skinTone',
+                      label: 'Skin Tone',
+                      description: 'Adjust the overall skin tone',
+                      onChange: handleSkinToneChange,
+                      showFor: ['all', 'face', 'eyes', 'eyebrows', 'nose', 'mouth'],
+                      render: (value: number, onChange: (value: number) => void, props: { label: string; description: string }) => (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-sm">{props.label}</span>
+                              <p className="text-xs text-muted-foreground">
+                                {props.description}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {originalSkinTones[selectedAttributeFeature] !== undefined && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs flex items-center gap-1"
+                                  onClick={() => {
+                                    // Get target layers
+                                    const targetLayers = selectedAttributeFeature === 'all' 
+                                      ? layers 
+                                      : layers.filter(layer => {
+                                          const layerCategory = layer.feature.category.toLowerCase();
+                                          return layerCategory === selectedAttributeFeature.toLowerCase() || 
+                                                 (selectedAttributeFeature === 'face' && layerCategory === 'faceshape');
+                                        });
+
+                                    // Remove all filters from target layers
+                                    targetLayers.forEach(layer => {
+                                      if (canvasRef.current) {
+                                        // Reset filters for this layer
+                                        canvasRef.current.resetFilters(layer.id);
+                                      }
+                                    });
+
+                                    // Get the original value for this feature
+                                    const originalValue = originalSkinTones[selectedAttributeFeature];
+                                    
+                                    // Update UI without applying filters
+                                    onChange(originalValue);
+                                    setAttributes(prev => ({
+                                      ...prev,
+                                      skinTone: originalValue
+                                    }));
+
+                                    // Set a flag to prevent handleSkinToneChange from being triggered
+                                    setIsResettingToOriginal(true);
+                                    
+                                    // Clear the flag after a short delay
+                                    setTimeout(() => {
+                                      setIsResettingToOriginal(false);
+                                    }, 100);
+                                  }}
+                                >
+                                  <div 
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ 
+                                      backgroundColor: SKIN_TONE_COLORS[Math.floor(originalSkinTones[selectedAttributeFeature] / (100 / (SKIN_TONE_COLORS.length - 1)))]
+                                    }} 
+                                  />
+                                  Original
+                                </Button>
+                              )}
+                              <span className="text-xs text-muted-foreground w-8 text-right">
+                                {value}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="relative">
+                            {/* Background gradient */}
+                            <div 
+                              className="absolute inset-0 rounded-md pointer-events-none"
+                              style={{
+                                background: `linear-gradient(to right, ${SKIN_TONE_COLORS.join(', ')})`,
+                                opacity: 0.5
+                              }}
+                            />
+                            
+                            {/* Slider */}
+                            <Slider
+                              value={[value]}
+                              min={0}
+                              max={100}
+                              step={1}
+                              onValueChange={([newValue]) => onChange(newValue)}
+                              className={cn(
+                                "w-full [&_[role=slider]]:bg-background",
+                                "[&_[role=slider]]:border-2",
+                                "[&_[role=slider]]:w-4",
+                                "[&_[role=slider]]:h-4",
+                                "[&_[role=slider]]:hover:border-primary",
+                                "[&_[role=slider]]:relative",
+                                "[&_[role=slider]]:z-20"
+                              )}
+                            />
+                          </div>
+
+                          {/* Color swatches */}
+                          <div className="flex justify-between mt-3">
+                            {SKIN_TONE_COLORS.map((color, index) => {
+                              const percentage = (index / (SKIN_TONE_COLORS.length - 1)) * 100;
+                              const isOriginal = originalSkinTones[selectedAttributeFeature] !== undefined && 
+                                Math.abs(percentage - originalSkinTones[selectedAttributeFeature]) < 10;
+                              const isCurrent = Math.abs(percentage - value) < 10;
+                              
+                              return (
+                                <div
+                                  key={color}
+                                  className={cn(
+                                    "group relative w-6 h-6 rounded-full border shadow-sm cursor-pointer hover:scale-110 transition-transform",
+                                    isOriginal && "ring-2 ring-primary ring-offset-1",
+                                    isCurrent && "ring-2 ring-primary/50"
+                                  )}
+                                  style={{ backgroundColor: color }}
+                                  onClick={() => onChange(percentage)}
+                                >
+                                  {isOriginal && (
+                                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                                      Original
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )
+                    },
+                    {
+                      key: 'contrast',
+                      label: 'Contrast',
+                      description: 'Adjust the contrast level',
+                      onChange: handleContrastChange,
+                      showFor: ['all', 'face', 'eyes', 'eyebrows', 'nose', 'mouth']
+                    },
+                    {
+                      key: 'sharpness',
+                      label: 'Sharpness',
+                      description: 'Control feature clarity',
+                      onChange: handleSharpnessChange,
+                      showFor: ['all', 'face', 'eyes', 'eyebrows', 'nose', 'mouth']
+                    }
+                  ].map((attr) => {
+                    // Only show controls that are relevant for the selected feature
+                    if (!attr.showFor.includes(selectedAttributeFeature)) {
+                      return null;
+                    }
+
+                    return (
+                      <div key={attr.key} className="space-y-2">
+                        {attr.render ? (
+                          attr.render(
+                            attributes[attr.key as keyof typeof attributes],
+                            (value) => {
+                              console.log(`${attr.key} slider value changed:`, value);
+                              if (attr.onChange) {
+                                attr.onChange(value, selectedAttributeFeature);
+                              } else {
+                                setAttributes(prev => ({
+                                  ...prev,
+                                  [attr.key]: value
+                                }));
+                              }
+                            },
+                            { label: attr.label, description: attr.description } // Pass the properties here
+                          )
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-sm">{attr.label}</span>
+                                <p className="text-xs text-muted-foreground">
+                                  {attr.description}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => {
+                                    // Get target layers
+                                    const targetLayers = selectedAttributeFeature === 'all' 
+                                      ? layers 
+                                      : layers.filter(layer => {
+                                          const layerCategory = layer.feature.category.toLowerCase();
+                                          return layerCategory === selectedAttributeFeature.toLowerCase() || 
+                                                 (selectedAttributeFeature === 'face' && layerCategory === 'faceshape');
+                                        });
+
+                                    // Reset filters for target layers
+                                    targetLayers.forEach(layer => {
+                                      if (canvasRef.current) {
+                                        canvasRef.current.resetFilters(layer.id);
+                                      }
+                                    });
+
+                                    // Reset the slider to neutral (50)
+                                    setAttributes(prev => ({
+                                      ...prev,
+                                      [attr.key]: 50
+                                    }));
+                                  }}
+                                >
+                                  Reset
+                                </Button>
+                                <span className="text-xs text-muted-foreground w-8 text-right">
+                                  {attributes[attr.key as keyof typeof attributes]}%
+                                </span>
+                              </div>
+                            </div>
+                            <Slider
+                              value={[attributes[attr.key as keyof typeof attributes]]}
+                              min={0}
+                              max={100}
+                              step={1}
+                              onValueChange={([value]) => {
+                                console.log(`${attr.key} slider value changed:`, value);
+                                if (attr.onChange) {
+                                  attr.onChange(value, selectedAttributeFeature);
+                                } else {
+                                  setAttributes(prev => ({
+                                    ...prev,
+                                    [attr.key]: value
+                                  }));
+                                }
+                              }}
+                              className="w-full"
+                            />
+                          </>
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground w-8 text-right">
-                        {attributes[attr.key as keyof typeof attributes]}%
-                      </span>
-                    </div>
-                    <Slider
-                      value={[attributes[attr.key as keyof typeof attributes]]}
-                      min={0}
-                      max={100}
-                      step={1}
-                      onValueChange={([value]) => {
-                        console.log(`${attr.key} slider value changed:`, value);
-                        if (attr.onChange) {
-                          attr.onChange(value);
-                        } else {
-                          setAttributes(prev => ({
-                            ...prev,
-                            [attr.key]: value
-                          }));
-                        }
-                      }}
-                      className="w-full"
-                    />
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
             </ScrollArea>
           </>
@@ -1834,31 +2060,25 @@ export default function CompositeEditor() {
   // Add new state for attributes loading
   const [isApplyingAttributes, setIsApplyingAttributes] = useState(false);
 
-  // Update handleSkinToneChange
-  const handleSkinToneChange = async (value: number) => {
-    console.log('handleSkinToneChange called:', { value });
-    
-    setIsApplyingAttributes(true);
-    
+  const detectInitialSkinTone = async (feature: string, layers: Layer[]) => {
     try {
-      setAttributes(prev => ({
-        ...prev,
-        skinTone: value
-      }));
-
-      if (!canvasRef.current) {
-        console.log('Canvas ref is null');
-        return;
-      }
-
-      // Get canvas element
       const stage = stageRef.current;
-      if (!stage) {
-        console.log('Stage ref is null');
-        return;
-      }
+      if (!stage) return;
 
-      // Create a new canvas from the stage's data URL
+      // For 'all' features, we want to detect the base face skin tone
+      const targetLayers = feature === 'all' 
+        ? layers.filter(layer => {
+            const layerCategory = layer.feature.category.toLowerCase();
+            return layerCategory === 'face' || layerCategory === 'faceshape';
+          })
+        : layers.filter(layer => {
+            const layerCategory = layer.feature.category.toLowerCase();
+            return layerCategory === feature.toLowerCase() || 
+                   (feature === 'face' && layerCategory === 'faceshape');
+          });
+
+      if (targetLayers.length === 0) return;
+
       const dataURL = stage.toDataURL();
       const tempCanvas = document.createElement('canvas');
       const tempCtx = tempCanvas.getContext('2d')!;
@@ -1875,16 +2095,115 @@ export default function CompositeEditor() {
       tempCanvas.height = stage.height();
       tempCtx.drawImage(img, 0, 0);
 
-      console.log('Getting skin analysis...');
-      const skinAnalysis = await analyzeFacialSkin(tempCanvas, layers);
-      console.log('Skin analysis result:', skinAnalysis);
-      
-      console.log('Applying skin tone adjustment...');
-      await canvasRef.current.adjustSkinTone(value, skinAnalysis);
-      
-      // Add small delay to ensure changes are rendered
-      await new Promise(resolve => setTimeout(resolve, 200));
+      const skinAnalysis = await analyzeFacialSkin(tempCanvas, targetLayers);
+      if (skinAnalysis?.dominantColor) {
+        const { s, l } = skinAnalysis.dominantColor;
+        // Calculate a percentage based on saturation and lightness
+        const percentage = Math.round(((s + l) / 2) * 100);
+        
+        // Store the original skin tone
+        setOriginalSkinTones(prev => ({
+          ...prev,
+          [feature]: percentage,
+          // For 'all', also store it as the face value
+          ...(feature === 'all' ? { face: percentage } : {})
+        }));
 
+        // Set the initial slider value to match the detected skin tone
+        setAttributes(prev => ({
+          ...prev,
+          skinTone: percentage
+        }));
+      }
+    } catch (error) {
+      console.error('Error detecting initial skin tone:', error);
+    }
+  };
+
+  // Update useEffect to detect initial skin tones when features are loaded
+  useEffect(() => {
+    if (layers.length > 0) {
+      const features = ['all', 'face', 'eyes', 'nose', 'mouth', 'eyebrows']; // Added 'all' to the list
+      features.forEach(feature => {
+        detectInitialSkinTone(feature, layers);
+      });
+    }
+  }, [layers]);
+
+  // Update handleSkinToneChange to store original value if not already stored
+  const handleSkinToneChange = async (value: number, feature: string = 'all') => {
+    // Skip if we're resetting to original
+    if (isResettingToOriginal) return;
+
+    // If this is the first adjustment for this feature, store the original value
+    if (originalSkinTones[feature] === undefined) {
+      await detectInitialSkinTone(feature, layers);
+    }
+
+    console.log('handleSkinToneChange called:', { value, feature });
+    setIsApplyingAttributes(true);
+    
+    try {
+      setAttributes(prev => ({
+        ...prev,
+        skinTone: value
+      }));
+
+      if (!canvasRef.current) return;
+
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      // Get only the layers that match the selected feature
+      const targetLayers = feature === 'all' 
+        ? layers 
+        : layers.filter(layer => {
+            const layerCategory = layer.feature.category.toLowerCase();
+            const selectedFeature = feature.toLowerCase();
+            
+            // Special handling for face/faceshape
+            if (selectedFeature === 'face') {
+              return layerCategory === 'face' || layerCategory === 'faceshape';
+            }
+            
+            return layerCategory === selectedFeature;
+          });
+
+      console.log('Adjusting skin tone for layers:', targetLayers);
+
+      if (targetLayers.length === 0) {
+        console.warn('No matching layers found for feature:', feature);
+        return;
+      }
+
+      // Create analysis for the specific feature(s)
+      const dataURL = stage.toDataURL();
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d')!;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = dataURL;
+      });
+
+      tempCanvas.width = stage.width();
+      tempCanvas.height = stage.height();
+      tempCtx.drawImage(img, 0, 0);
+
+      // Get skin analysis for the specific feature(s)
+      const skinAnalysis = await analyzeFacialSkin(tempCanvas, targetLayers);
+      
+      // Apply skin tone only to the selected feature(s)
+      for (const layer of targetLayers) {
+        if (canvasRef.current) {
+          await canvasRef.current.adjustSkinTone(value, skinAnalysis, layer.id);
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 200));
     } catch (error) {
       console.error('Error in handleSkinToneChange:', error);
       toast.error('Failed to adjust skin tone');
@@ -1894,8 +2213,8 @@ export default function CompositeEditor() {
   };
 
   // Update handleContrastChange
-  const handleContrastChange = async (value: number) => {
-    console.log('Handling contrast change:', value);
+  const handleContrastChange = async (value: number, feature: string = 'all') => {
+    console.log('Handling contrast change:', { value, feature });
     setIsApplyingAttributes(true);
     
     try {
@@ -1905,8 +2224,23 @@ export default function CompositeEditor() {
       }));
 
       if (canvasRef.current) {
-        await canvasRef.current.adjustContrast(value);
-        await new Promise(resolve => setTimeout(resolve, 200));
+        const targetLayers = feature === 'all' 
+          ? layers 
+          : layers.filter(layer => {
+              const layerCategory = layer.feature.category.toLowerCase();
+              return layerCategory === feature.toLowerCase() || 
+                     (feature === 'face' && layerCategory === 'faceshape');
+            });
+
+        // Apply contrast to each layer individually
+        for (const layer of targetLayers) {
+          await canvasRef.current.adjustContrast(value, layer.id);
+        }
+
+        // Add delay only when applying to all features
+        if (feature === 'all') {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
       }
     } catch (error) {
       console.error('Error adjusting contrast:', error);
@@ -1917,7 +2251,8 @@ export default function CompositeEditor() {
   };
 
   // Update handleSharpnessChange
-  const handleSharpnessChange = async (value: number) => {
+  const handleSharpnessChange = async (value: number, feature: string = 'all') => {
+    console.log('Handling sharpness change:', { value, feature });
     setIsApplyingAttributes(true);
     
     try {
@@ -1925,10 +2260,25 @@ export default function CompositeEditor() {
         ...prev,
         sharpness: value
       }));
-      
+
       if (canvasRef.current) {
-        await canvasRef.current.adjustSharpness(value);
-        await new Promise(resolve => setTimeout(resolve, 200));
+        const targetLayers = feature === 'all' 
+          ? layers 
+          : layers.filter(layer => {
+              const layerCategory = layer.feature.category.toLowerCase();
+              return layerCategory === feature.toLowerCase() || 
+                     (feature === 'face' && layerCategory === 'faceshape');
+            });
+
+        // Apply sharpness to each layer individually
+        for (const layer of targetLayers) {
+          await canvasRef.current.adjustSharpness(value, layer.id);
+        }
+
+        // Add delay only when applying to all features
+        if (feature === 'all') {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
       }
     } catch (error) {
       console.error('Error adjusting sharpness:', error);
@@ -2578,6 +2928,18 @@ export default function CompositeEditor() {
       </div>
     );
   };
+
+  // Add this near other state declarations at the top of the CompositeEditor component
+  const [selectedAttributeFeature, setSelectedAttributeFeature] = useState<'all' | 'face' | 'eyes' | 'eyebrows' | 'nose' | 'mouth'>('all');
+
+  // Add this to your state declarations
+  const [originalSkinTones, setOriginalSkinTones] = useState<Record<string, number>>({});
+
+  // Add this state near your other state declarations
+  const [isResettingToOriginal, setIsResettingToOriginal] = useState(false);
+
+  // Add these to your state declarations
+  const [originalValues, setOriginalValues] = useState<Record<string, Record<string, number>>>({});
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -3291,7 +3653,7 @@ export default function CompositeEditor() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span>Undo</span>
-                          <kbd className="px-2 py-1 rounded bg-muted">⌘ Z</kbd>
+                          <kbd className="px-2 py-1 rounded bg-muted">��� Z</kbd>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span>Redo</span>

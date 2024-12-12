@@ -27,13 +27,14 @@ interface CanvasRef {
   rotateFeature: (featureType: string, angle: number) => void
   scaleFeature: (featureType: string, scaleX: number, scaleY: number) => void
   flipFeature: (featureType: string, direction: 'horizontal' | 'vertical') => void
-  adjustSkinTone: (value: number, skinAnalysis?: SkinAnalysisResult) => void
-  adjustContrast: (value: number) => void
-  adjustSharpness: (value: number) => void
+  adjustSkinTone: (value: number, analysis: any, layerId: string) => void
+  adjustContrast: (value: number, layerId?: string) => void
+  adjustSharpness: (value: number, layerId?: string) => void
   adjustPoliceSketchEffect: (value: number) => void
   adjustLineWeight: (value: number) => void
   adjustTextureIntensity: (value: number) => void
   resetAllFilters: () => void
+  resetFilters: (layerId: string) => void
 }
 
 const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
@@ -129,96 +130,86 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
     layerRef.current?.batchDraw();
   };
 
-  const applyContrastFilter = (value: number) => {
-    console.log('Applying contrast adjustment:', value);
-    // Increase the contrast range by using a larger multiplier
-    const normalizedValue = ((value - 50) / 50) * 8; // Changed from 4 to 8 for stronger effect
+  const applyContrastFilter = (value: number, layerId?: string) => {
+    console.log('Applying contrast adjustment:', value, 'to layer:', layerId);
+    const normalizedValue = ((value - 50) / 50) * 8;
     
-    imagesRef.current.forEach((image, id) => {
-      // Get category for feature-specific adjustments
-      const category = id.split('_')[0];
-      
-      // Preserve existing filters (like HSL) and add Contrast if not present
-      let currentFilters = image.filters() || [];
+    // If layerId is provided, only adjust that specific layer
+    if (layerId) {
+      const targetImage = imagesRef.current.get(layerId);
+      if (!targetImage) return;
+
+      let currentFilters = targetImage.filters() || [];
       if (!currentFilters.includes(Konva.Filters.Contrast)) {
         currentFilters.push(Konva.Filters.Contrast);
       }
       
-      // Make sure we're not losing HSL filters if they exist
-      if (!currentFilters.includes(Konva.Filters.HSL) && 
-          category === 'face') {
-        currentFilters.push(Konva.Filters.HSL);
-      }
-      
-      // Apply all filters
-      image.filters(currentFilters);
-      
-      // Increased multipliers for stronger contrast
-      const contrastMultiplier = 
-        category === 'face' ? 1.5 :    // Increased from 1.2
-        category === 'eyes' ? 2.0 :    // Increased from 1.5
-        category === 'eyebrows' ? 1.8 : // Increased from 1.3
-        category === 'nose' ? 1.5 :    // Increased from 1.2
-        category === 'mouth' ? 1.4 :   // Increased from 1.1
-        1.3;                          // Increased from 1.0
-      
-      // Apply contrast with multiplier
-      image.contrast(normalizedValue * contrastMultiplier);
-      
-      // Important: Cache the result
-      image.cache();
-    });
+      targetImage.filters(currentFilters);
+      targetImage.contrast(normalizedValue);
+      targetImage.cache();
+    } else {
+      // Original behavior for all layers
+      imagesRef.current.forEach((image) => {
+        let currentFilters = image.filters() || [];
+        if (!currentFilters.includes(Konva.Filters.Contrast)) {
+          currentFilters.push(Konva.Filters.Contrast);
+        }
+        image.filters(currentFilters);
+        image.contrast(normalizedValue);
+        image.cache();
+      });
+    }
     
-    // Force redraw
     layerRef.current?.batchDraw();
   };
 
-  const applySharpnessFilter = (value: number) => {
-    console.log('Applying sharpness adjustment with value:', value);
+  const applySharpnessFilter = (value: number, layerId?: string) => {
+    console.log('Applying sharpness adjustment:', value, 'to layer:', layerId);
     
-    // Debounce the filter application
     if (window.requestAnimationFrame) {
       window.requestAnimationFrame(() => {
-        imagesRef.current.forEach((image, id) => {
-          const category = id.split('_')[0];
-          let currentFilters = image.filters() || [];
-          
-          // Reset filters if value is at neutral (50)
+        if (layerId) {
+          const targetImage = imagesRef.current.get(layerId);
+          if (!targetImage) return;
+
+          let currentFilters = targetImage.filters() || [];
           if (value === 50) {
             currentFilters = currentFilters.filter(
               filter => filter !== Konva.Filters.Enhance
             );
-            image.filters(currentFilters);
-            image.enhance(0);
+            targetImage.filters(currentFilters);
+            targetImage.enhance(0);
           } else {
-            // Add Enhance filter if not present
             if (!currentFilters.includes(Konva.Filters.Enhance)) {
               currentFilters.push(Konva.Filters.Enhance);
             }
-            
-            image.filters(currentFilters);
-            
-            // More subtle normalization range
-            const normalizedValue = (value - 50) / 100; // Reduced range for subtler effect
-            
-            // Reduced multipliers for more subtle effect
-            const sharpnessMultiplier = 
-              category === 'face' ? 0.3 :     // Reduced from 0.5
-              category === 'eyes' ? 0.6 :     // Reduced from 1.2
-              category === 'eyebrows' ? 0.4 : // Reduced from 0.8
-              category === 'nose' ? 0.3 :     // Reduced from 0.6
-              category === 'mouth' ? 0.3 :    // Reduced from 0.7
-              0.3;                           // Default
-            
-            // Apply single enhance filter for better performance
-            image.enhance(normalizedValue * sharpnessMultiplier);
+            targetImage.filters(currentFilters);
+            const normalizedValue = (value - 50) / 100;
+            targetImage.enhance(normalizedValue * 0.5);
           }
-          
-          // Cache the result
-          image.cache();
-        });
+          targetImage.cache();
+        } else {
+          // Original behavior for all layers
+          imagesRef.current.forEach((image) => {
+            let currentFilters = image.filters() || [];
+            if (value === 50) {
+              currentFilters = currentFilters.filter(
+                filter => filter !== Konva.Filters.Enhance
+              );
+              image.filters(currentFilters);
+              image.enhance(0);
+            } else {
+              if (!currentFilters.includes(Konva.Filters.Enhance)) {
+                currentFilters.push(Konva.Filters.Enhance);
+              }
+              image.filters(currentFilters);
+              const normalizedValue = (value - 50) / 100;
+              image.enhance(normalizedValue * 0.5);
+            }
+            image.cache();
+          });
+        }
         
-        // Single batch draw for better performance
         layerRef.current?.batchDraw();
       });
     }
@@ -453,21 +444,135 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>((props, ref) => {
         layerRef.current?.batchDraw();
       }
     },
-    adjustSkinTone: (value: number, skinAnalysis?: SkinAnalysisResult) => {
-      console.log('adjustSkinTone ref method called:', { value });
-      applySkinToneFilter(value, skinAnalysis);
+    adjustSkinTone: (value: number, analysis: any, layerId: string) => {
+      console.log('Adjusting skin tone for layer:', { layerId, value, analysis });
+      
+      // Find the image by layer ID
+      const targetImage = imagesRef.current.get(layerId);
+      if (!targetImage) {
+        console.error('Target image not found for ID:', layerId);
+        return;
+      }
+
+      // Get category from the image ID and check if it's a base face layer
+      const imageId = targetImage.id().toLowerCase();
+      console.log('Image ID:', imageId);
+      
+      // Find if this is a base face layer
+      const isBaseFace = imageId.includes('faceshape') || 
+                        (imageId.includes('face') && Array.from(imagesRef.current.entries())
+                          .findIndex(([id]) => id === layerId) === 0);
+                          
+      const category = isBaseFace ? 'faceshape' : imageId.split('_')[0];
+      console.log('Detected category:', category, 'isBaseFace:', isBaseFace);
+
+      // If value is 0 or very close to 0, remove all filters
+      if (value <= 1) {
+        targetImage.filters([]);
+        targetImage.saturation(1);
+        targetImage.brightness(1);
+        targetImage.contrast(1);
+        targetImage.hue(0);
+        targetImage.cache();
+        layerRef.current?.batchDraw();
+        return;
+      }
+
+      const normalizedValue = value / 100;
+
+      // Add HSL filter if not present
+      let currentFilters = targetImage.filters() || [];
+      if (!currentFilters.includes(Konva.Filters.HSL)) {
+        currentFilters.push(Konva.Filters.HSL);
+        targetImage.filters(currentFilters);
+      }
+
+      // Apply skin tone adjustments based on analysis
+      if (analysis?.dominantColor) {
+        const { h, s, l } = analysis.dominantColor;
+        
+        if (isBaseFace) {
+          // Enhanced adjustments specifically for base face
+          targetImage.saturation(Math.max(0, Math.min(1, s/100 + (normalizedValue * 0.5)))); // Stronger effect
+          const lightnessAdjustment = normalizedValue * 0.3; // Stronger effect
+          targetImage.brightness(Math.max(0, Math.min(1, l/100 + lightnessAdjustment)));
+          const warmth = normalizedValue > 0 ? normalizedValue * 0.2 : 0; // Stronger effect
+          targetImage.hue(warmth);
+        } else {
+          // Regular feature adjustments
+          const strengthMultiplier = 
+            category === 'nose' ? 1.0 :
+            category === 'mouth' ? 0.8 :
+            category === 'eyes' || category === 'eyebrows' ? 0.6 :
+            0.7;
+
+          targetImage.saturation(Math.max(0, Math.min(1, s/100 + (normalizedValue * 0.3 * strengthMultiplier))));
+          const lightnessAdjustment = normalizedValue * 0.2 * strengthMultiplier;
+          targetImage.brightness(Math.max(0, Math.min(1, l/100 + lightnessAdjustment)));
+          const warmth = normalizedValue > 0 ? normalizedValue * 0.1 * strengthMultiplier : 0;
+          targetImage.hue(warmth);
+        }
+      } else {
+        // Fallback adjustments
+        if (isBaseFace) {
+          // Enhanced fallback adjustments for base face
+          targetImage.saturation(0.5 + (normalizedValue * 0.3));
+          targetImage.brightness(0.5 + (normalizedValue * 0.25));
+        } else {
+          const strengthMultiplier = 
+            category === 'nose' ? 1.0 :
+            category === 'mouth' ? 0.8 :
+            category === 'eyes' || category === 'eyebrows' ? 0.6 :
+            0.7;
+
+          targetImage.saturation(0.5 + (normalizedValue * 0.2 * strengthMultiplier));
+          targetImage.brightness(0.5 + (normalizedValue * 0.15 * strengthMultiplier));
+        }
+      }
+
+      // Cache and redraw
+      targetImage.cache();
+      layerRef.current?.batchDraw();
     },
-    adjustContrast: (value: number) => {
-      applyContrastFilter(value);
+    adjustContrast: (value: number, layerId?: string) => {
+      applyContrastFilter(value, layerId);
     },
-    adjustSharpness: (value: number) => {
-      console.log('adjustSharpness called with value:', value);
-      applySharpnessFilter(value);
+    adjustSharpness: (value: number, layerId?: string) => {
+      console.log('adjustSharpness called with value:', value, 'layerId:', layerId);
+      applySharpnessFilter(value, layerId);
     },
     adjustPoliceSketchEffect,
     adjustLineWeight,
     adjustTextureIntensity,
-    resetAllFilters
+    resetAllFilters,
+    resetFilters: (layerId: string) => {
+      const targetImage = imagesRef.current.get(layerId);
+      if (!targetImage) return;
+
+      console.log('Resetting filters for layer:', layerId);
+
+      // Remove all filters first
+      targetImage.filters([]);
+      
+      // Reset all filter-related properties to their default values
+      targetImage.saturation(1);
+      targetImage.brightness(1);
+      targetImage.contrast(1);
+      targetImage.hue(0);
+      targetImage.value(1);
+      targetImage.blurRadius(0);
+      targetImage.red(1);
+      targetImage.green(1);
+      targetImage.blue(1);
+      targetImage.alpha(1);
+      
+      // Ensure HSL filters are removed
+      targetImage.filters([]);
+      
+      // Cache and redraw
+      targetImage.cache();
+      layerRef.current?.batchDraw();
+    },
   }))
 
   useEffect(() => {
